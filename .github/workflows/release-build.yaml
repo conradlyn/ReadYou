@@ -1,0 +1,77 @@
+name: "Build & Release APK"
+
+# Additive file, like manual-build.yaml: it never conflicts with the upstream workflows.
+#
+# Why a release instead of an artifact: upload-artifact always wraps its payload in a zip, and
+# downloading that zip requires a signed-in GitHub session even on a public repo. A release asset
+# is a bare .apk behind a stable public URL, so it can be tapped straight from a tablet browser.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create or update"
+        required: true
+        default: "tablet-preview"
+      task:
+        description: "Gradle assemble task"
+        required: true
+        default: "assembleGithubRelease"
+        type: choice
+        options:
+          - assembleGithubRelease
+          - assembleGithubDebug
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+# Keyed on the tag, so two runs cutting the same release queue instead of racing. Not
+# cancel-in-progress: a half-uploaded release is worse than a slow one.
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble
+        run: ./gradlew ${{ inputs.task || 'assembleGithubRelease' }} --max-workers=2
+
+      # Uses the gh CLI that ships with the runner rather than a third-party release action, to
+      # keep the supply chain the same as the rest of this repo.
+      - name: Publish APK to a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/*/*/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "::error::no APK was produced, nothing to publish"
+            exit 1
+          fi
+          printf 'asset: %s\n' "${apks[@]}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${apks[@]}" --clobber
+          else
+            gh release create "$TAG" "${apks[@]}" \
+              --title "$TAG" \
+              --prerelease \
+              --notes "Built from \`${GITHUB_SHA}\` by the **${GITHUB_WORKFLOW}** workflow.
+
+          Signed with the debug keystore committed at \`signature/reader.keystore\`, so it will not
+          install over an F-Droid or Google Play build. Uninstall those first."
+          fi
