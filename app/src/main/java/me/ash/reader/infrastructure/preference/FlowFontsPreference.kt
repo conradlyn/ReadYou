@@ -10,7 +10,7 @@ import me.ash.reader.ui.ext.DataStoreKey.Companion.flowFonts
 import me.ash.reader.ui.ext.dataStore
 import me.ash.reader.ui.ext.put
 
-val LocalFlowFonts = compositionLocalOf { ListFontsPreference.default }
+val LocalFlowFonts = compositionLocalOf<ListFontsPreference> { ListFontsPreference.default }
 
 object FlowFontsPreference {
 

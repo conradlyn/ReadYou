@@ -60,7 +60,7 @@ sealed class ListFontsPreference(val value: Int) {
 
     companion object {
 
-        val default = Default
+        val default: ListFontsPreference = Default
 
         /** Mirrors [ReadingFontsPreference.values], with [Default] prepended. */
         val values =

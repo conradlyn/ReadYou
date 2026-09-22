@@ -10,7 +10,7 @@ import me.ash.reader.ui.ext.DataStoreKey.Companion.feedsFonts
 import me.ash.reader.ui.ext.dataStore
 import me.ash.reader.ui.ext.put
 
-val LocalFeedsFonts = compositionLocalOf { ListFontsPreference.default }
+val LocalFeedsFonts = compositionLocalOf<ListFontsPreference> { ListFontsPreference.default }
 
 object FeedsFontsPreference {
 

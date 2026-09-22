@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.isSp
+import androidx.compose.ui.unit.TextUnit
 import me.ash.reader.infrastructure.preference.FeedsTextFontSizePreference
 import me.ash.reader.infrastructure.preference.FlowTextFontSizePreference
 import me.ash.reader.infrastructure.preference.LocalFeedsFonts
@@ -46,7 +46,10 @@ private fun TextStyle.withListStyle(
     if (fontFamily == null && scale == 1f) return this
     return copy(
         fontFamily = fontFamily ?: this.fontFamily,
-        fontSize = if (fontSize.isSp) fontSize * scale else fontSize,
-        lineHeight = if (lineHeight.isSp) lineHeight * scale else lineHeight,
+        fontSize = fontSize.scaledBy(scale),
+        lineHeight = lineHeight.scaledBy(scale),
     )
 }
+
+private fun TextUnit.scaledBy(scale: Float): TextUnit =
+    if (this == TextUnit.Unspecified) this else this * scale

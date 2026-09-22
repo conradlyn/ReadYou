@@ -25,7 +25,7 @@ object FeedsTextFontSizePreference {
     const val max = 32
     const val default = baseline
 
-    fun coerceToRange(value: Int): Int = value.coerceIn(min, max)
+    fun Int.coerceToRange(): Int = coerceIn(min..max)
 
     fun put(context: Context, scope: CoroutineScope, value: Int) {
         scope.launch {

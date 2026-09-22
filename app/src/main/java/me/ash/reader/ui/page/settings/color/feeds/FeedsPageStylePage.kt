@@ -18,6 +18,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.*
+import me.ash.reader.infrastructure.preference.FeedsTextFontSizePreference.coerceToRange
 import me.ash.reader.ui.component.base.*
 import me.ash.reader.ui.page.settings.SettingItem
 import me.ash.reader.ui.theme.palette.onLight
