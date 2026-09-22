@@ -33,6 +33,7 @@ import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.LocalNewVersionNumber
 import me.ash.reader.infrastructure.preference.LocalSkipVersionNumber
 import me.ash.reader.infrastructure.preference.toDisplayName
+import me.ash.reader.ui.adaptive.rememberAdaptiveContentPadding
 import me.ash.reader.ui.component.base.Banner
 import me.ash.reader.ui.component.base.DisplayText
 import me.ash.reader.ui.component.base.FeedbackIconButton
@@ -70,7 +71,7 @@ fun SettingsPage(
             )
         },
         content = {
-            LazyColumn {
+            LazyColumn(contentPadding = rememberAdaptiveContentPadding()) {
                 item {
                     DisplayText(text = stringResource(R.string.settings), desc = "")
                 }

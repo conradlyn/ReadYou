@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import me.ash.reader.infrastructure.preference.LocalBasicFonts
 import me.ash.reader.infrastructure.preference.LocalThemeIndex
+import me.ash.reader.ui.adaptive.ProvideAdaptiveLayout
 import me.ash.reader.ui.theme.palette.LocalTonalPalettes
 import me.ash.reader.ui.theme.palette.TonalPalettes
 import me.ash.reader.ui.theme.palette.core.ProvideZcamViewingConditions
@@ -74,7 +75,7 @@ fun AppTheme(
                         .asTypography(LocalContext.current)
                         .applyTextDirection(),
                 shapes = Shapes,
-                content = content,
+                content = { ProvideAdaptiveLayout { content() } },
             )
         }
     }
