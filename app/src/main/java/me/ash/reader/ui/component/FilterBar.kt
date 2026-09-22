@@ -4,12 +4,14 @@ import android.os.Build
 import android.view.SoundEffectConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectableGroup
@@ -28,6 +30,13 @@ import me.ash.reader.infrastructure.preference.LocalThemeIndex
 import me.ash.reader.ui.ext.surfaceColorAtElevation
 import me.ash.reader.ui.theme.palette.onDark
 
+/**
+ * @param contentPadding horizontal inset applied to the items while the surface behind them stays
+ *   full-bleed. Callers on a wide window pass the adaptive gutter so the items line up with the
+ *   centred content column instead of being pinned to the left edge. Deliberately opt-in and
+ *   defaulted to zero: this composable is also used inside a pane (FlowPage) and inside the style
+ *   previews, where a window-width gutter would over-inset.
+ */
 @Composable
 fun FilterBar(
     modifier: Modifier = Modifier,
@@ -36,6 +45,7 @@ fun FilterBar(
     filterBarFilled: Boolean,
     filterBarPadding: Dp,
     filterBarTonalElevation: Dp,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     filterOnClick: (Filter) -> Unit = {},
 ) {
     val view = LocalView.current
@@ -60,6 +70,7 @@ fun FilterBar(
             Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(NavigationBarDefaults.windowInsets)
+                .padding(contentPadding)
                 .defaultMinSize(minHeight = containerHeight)
                 .selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

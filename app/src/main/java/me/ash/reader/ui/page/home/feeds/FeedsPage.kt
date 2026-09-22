@@ -349,6 +349,7 @@ fun FeedsPage(
                 filterBarFilled = true,
                 filterBarPadding = filterBarPadding.dp,
                 filterBarTonalElevation = filterBarTonalElevation.value.dp,
+                contentPadding = rememberAdaptiveContentPadding(),
             ) {
                 feedsViewModel.changeFilter(filterState.copy(filter = it))
             }
