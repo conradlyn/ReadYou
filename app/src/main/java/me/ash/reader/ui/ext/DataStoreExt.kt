@@ -146,6 +146,8 @@ sealed interface PreferencesKey {
         const val feedsTopBarTonalElevation = "feedsTopBarTonalElevation"
         const val feedsGroupListExpand = "feedsGroupListExpand"
         const val feedsGroupListTonalElevation = "feedsGroupListTonalElevation"
+        const val feedsFonts = "feedsFonts"
+        const val feedsTextFontSize = "feedsTextFontSize"
 
         // Flow page
         const val flowFilterBarStyle = "flowFilterBarStyle"
@@ -161,6 +163,8 @@ sealed interface PreferencesKey {
         const val flowArticleListTonalElevation = "flowArticleListTonalElevation"
         const val flowArticleListReadIndicator = "flowArticleListReadStatusIndicator"
         const val flowSortUnreadArticles = "flowArticleListSortUnreadArticles"
+        const val flowFonts = "flowFonts"
+        const val flowTextFontSize = "flowTextFontSize"
 
         // Reading page
         const val readingRenderer = "readingRender"
@@ -225,6 +229,8 @@ sealed interface PreferencesKey {
                 IntKey(feedsTopBarTonalElevation),
                 BooleanKey(feedsGroupListExpand),
                 IntKey(feedsGroupListTonalElevation),
+                IntKey(feedsFonts),
+                IntKey(feedsTextFontSize),
                 // Flow page
                 IntKey(flowFilterBarStyle),
                 IntKey(flowFilterBarPadding),
@@ -239,6 +245,8 @@ sealed interface PreferencesKey {
                 IntKey(flowArticleListTonalElevation),
                 IntKey(flowArticleListReadIndicator),
                 BooleanKey(flowSortUnreadArticles),
+                IntKey(flowFonts),
+                IntKey(flowTextFontSize),
                 // Reading page
                 IntKey(readingRenderer),
                 BooleanKey(readingBoldCharacters),
@@ -308,6 +316,8 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
         const val feedsTopBarTonalElevation = "feedsTopBarTonalElevation"
         const val feedsGroupListExpand = "feedsGroupListExpand"
         const val feedsGroupListTonalElevation = "feedsGroupListTonalElevation"
+        const val feedsFonts = "feedsFonts"
+        const val feedsTextFontSize = "feedsTextFontSize"
 
         // Flow page
         const val flowFilterBarStyle = "flowFilterBarStyle"
@@ -323,6 +333,8 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
         const val flowArticleListTonalElevation = "flowArticleListTonalElevation"
         const val flowArticleListReadIndicator = "flowArticleListReadStatusIndicator"
         const val flowSortUnreadArticles = "flowArticleListSortUnreadArticles"
+        const val flowFonts = "flowFonts"
+        const val flowTextFontSize = "flowTextFontSize"
 
         // Reading page
         const val readingRenderer = "readingRender"
@@ -404,6 +416,9 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
                     DataStoreKey(booleanPreferencesKey(feedsGroupListExpand), Boolean::class.java),
                 feedsGroupListTonalElevation to
                     DataStoreKey(intPreferencesKey(feedsGroupListTonalElevation), Int::class.java),
+                feedsFonts to DataStoreKey(intPreferencesKey(feedsFonts), Int::class.java),
+                feedsTextFontSize to
+                    DataStoreKey(intPreferencesKey(feedsTextFontSize), Int::class.java),
                 // Flow page
                 flowFilterBarStyle to
                     DataStoreKey(intPreferencesKey(flowFilterBarStyle), Int::class.java),
@@ -443,6 +458,9 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
                         booleanPreferencesKey(flowSortUnreadArticles),
                         Boolean::class.java,
                     ),
+                flowFonts to DataStoreKey(intPreferencesKey(flowFonts), Int::class.java),
+                flowTextFontSize to
+                    DataStoreKey(intPreferencesKey(flowTextFontSize), Int::class.java),
                 // Reading page
                 readingRenderer to
                     DataStoreKey(intPreferencesKey(readingRenderer), Int::class.java),

@@ -148,6 +148,7 @@
     <string name="amoled_dark_theme">Black dark theme</string>
     <string name="tonal_elevation">Tonal elevation</string>
     <string name="reading_fonts">Reading fonts</string>
+    <string name="list_fonts">List fonts</string>
     <string name="basic_fonts">Basic fonts</string>
     <string name="google_sans" translatable="false">Google Sans Flex</string>
     <string name="feeds_page">Feeds page</string>
@@ -198,6 +199,7 @@
     <string name="tips_top_bar_tonal_elevation">Tonal elevation for the top bar list is only available when scrolling</string>
     <string name="tips_article_list_tonal_elevation">Tonal elevation for the article list is only available in the light theme</string>
     <string name="tips_group_list_tonal_elevation">Tonal elevation for the group list is only available in the light theme</string>
+    <string name="tips_list_external_fonts">"External fonts" uses the font you imported on the reading page</string>
     <string name="share">Share</string>
     <string name="touch_to_play_video">Tap to play a video</string>
     <string name="text">Text</string>

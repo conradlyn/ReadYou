@@ -76,6 +76,7 @@ import me.ash.reader.ui.component.base.SIZE_1000
 import me.ash.reader.ui.component.menu.AnimatedDropdownMenu
 import me.ash.reader.ui.component.swipe.SwipeAction
 import me.ash.reader.ui.component.swipe.SwipeableActionsBox
+import me.ash.reader.ui.component.withFlowListStyle
 import me.ash.reader.ui.ext.requiresBidi
 import me.ash.reader.ui.ext.surfaceColorAtElevation
 import me.ash.reader.ui.page.settings.color.flow.generateArticleWithFeedPreview
@@ -171,7 +172,7 @@ fun ArticleItem(
                             ),
                     text = feedName,
                     color = MaterialTheme.colorScheme.tertiary,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelMedium.withFlowListStyle(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -188,7 +189,7 @@ fun ArticleItem(
                             modifier = Modifier,
                             text = timeString ?: "",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelMedium.withFlowListStyle(),
                         )
                     }
                 }
@@ -202,7 +203,7 @@ fun ArticleItem(
                             modifier = Modifier.weight(1f),
                             text = timeString ?: "",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelMedium.withFlowListStyle(),
                         )
                         // Starred
                         if (isStarred) {
@@ -235,7 +236,8 @@ fun ArticleItem(
                         style =
                             MaterialTheme.typography.titleMedium
                                 .applyTextDirection(title.requiresBidi())
-                                .merge(lineHeight = 22.sp),
+                                .merge(lineHeight = 22.sp)
+                                .withFlowListStyle(),
                         maxLines =
                             if (articleListDesc != FlowArticleListDescPreference.NONE) 2 else 4,
                         overflow = TextOverflow.Ellipsis,
@@ -262,7 +264,7 @@ fun ArticleItem(
                         style =
                             MaterialTheme.typography.bodySmall.applyTextDirection(
                                 shortDescription.requiresBidi()
-                            ),
+                            ).withFlowListStyle(),
                         maxLines =
                             when (articleListDesc) {
                                 FlowArticleListDescPreference.LONG -> 4

@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import me.ash.reader.ui.component.withFlowListStyle
 import me.ash.reader.ui.ext.surfaceColorAtElevation
 import me.ash.reader.ui.theme.palette.onDark
 
@@ -36,7 +37,7 @@ fun StickyHeader(
                 .padding(top = 8.dp, bottom = 4.dp),
             text = dateString,
             color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelLarge.withFlowListStyle(),
         )
     }
 }

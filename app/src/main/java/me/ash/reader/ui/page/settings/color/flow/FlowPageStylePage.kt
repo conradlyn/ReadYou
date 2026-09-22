@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.*
@@ -39,6 +40,8 @@ fun FlowPageStylePage(
     val articleListTonalElevation = LocalFlowArticleListTonalElevation.current
     val articleListReadIndicator = LocalFlowArticleListReadIndicator.current
     val sortUnreadArticles = LocalSortUnreadArticles.current
+    val fonts = LocalFlowFonts.current
+    val fontSize = LocalFlowTextFontSize.current
 
     val settings = LocalSettings.current
     val pullToSwitchFeed = settings.pullToSwitchFeed
@@ -57,6 +60,11 @@ fun FlowPageStylePage(
     var showSortUnreadArticlesDialog by remember { mutableStateOf(false) }
 
     var filterBarPaddingValue: Int? by remember { mutableStateOf(filterBarPadding) }
+
+    var fontsDialogVisible by remember { mutableStateOf(false) }
+    var fontSizeDialogVisible by remember { mutableStateOf(false) }
+
+    var fontSizeValue: Int? by remember { mutableStateOf(fontSize) }
 
     RYScaffold(
         containerColor = MaterialTheme.colorScheme.surface onLight MaterialTheme.colorScheme.inverseOnSurface,
@@ -98,6 +106,26 @@ fun FlowPageStylePage(
                             filterBarTonalElevation = filterBarTonalElevation.value.dp,
                         )
                     }
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+
+                // Text
+                item {
+                    Subtitle(
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                        text = stringResource(R.string.text)
+                    )
+                    SettingItem(
+                        title = stringResource(R.string.list_fonts),
+                        desc = fonts.toDesc(context),
+                        onClick = { fontsDialogVisible = true },
+                    ) {}
+                    SettingItem(
+                        title = stringResource(R.string.font_size),
+                        desc = "${fontSize}sp",
+                        onClick = { fontSizeDialogVisible = true },
+                    ) {}
+                    Tips(text = stringResource(R.string.tips_list_external_fonts))
                     Spacer(modifier = Modifier.height(24.dp))
                 }
 
@@ -396,6 +424,43 @@ fun FlowPageStylePage(
         },
         onDismissRequest = {
             showPullToLoadDialog = false
+        }
+    )
+
+    RadioDialog(
+        visible = fontsDialogVisible,
+        title = stringResource(R.string.list_fonts),
+        options = ListFontsPreference.values.map {
+            RadioDialogOption(
+                text = it.toDesc(context),
+                style = it.asFontFamily(context)?.let { family -> TextStyle(fontFamily = family) },
+                selected = it == fonts,
+            ) {
+                FlowFontsPreference.put(context, scope, it)
+            }
+        }
+    ) {
+        fontsDialogVisible = false
+    }
+
+    TextFieldDialog(
+        visible = fontSizeDialogVisible,
+        title = stringResource(R.string.font_size),
+        value = (fontSizeValue ?: "").toString(),
+        placeholder = stringResource(R.string.value),
+        onValueChange = {
+            fontSizeValue = it.filter { it.isDigit() }.toIntOrNull()
+        },
+        onDismissRequest = {
+            fontSizeDialogVisible = false
+        },
+        onConfirm = {
+            FlowTextFontSizePreference.put(
+                context,
+                scope,
+                (fontSizeValue ?: FlowTextFontSizePreference.default).coerceToRange()
+            )
+            fontSizeDialogVisible = false
         }
     )
 }

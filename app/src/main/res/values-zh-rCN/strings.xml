@@ -123,6 +123,7 @@
     <string name="other">其他</string>
     <string name="tonal_elevation">色调海拔</string>
     <string name="reading_fonts">阅读字体</string>
+    <string name="list_fonts">列表字体</string>
     <string name="basic_fonts">基本字体</string>
     <string name="feeds_page">订阅源页面</string>
     <string name="flow_page">信息流页面</string>
@@ -167,6 +168,7 @@
     <string name="tips_top_bar_tonal_elevation">标题栏列表的色调海拔仅在滚动时可用</string>
     <string name="tips_article_list_tonal_elevation">文章列表的色调海拔仅在亮色主题时可用</string>
     <string name="tips_group_list_tonal_elevation">分组列表的色调海拔仅在亮色主题时可用</string>
+    <string name="tips_list_external_fonts">“External fonts” 会使用你在阅读页导入的字体</string>
     <string name="share">分享</string>
     <string name="touch_to_play_video">轻触播放视频</string>
     <string name="text">文本</string>

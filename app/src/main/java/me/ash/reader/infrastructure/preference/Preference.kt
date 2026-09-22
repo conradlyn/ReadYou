@@ -33,6 +33,8 @@ fun Preferences.toSettings(): Settings {
         feedsTopBarTonalElevation = FeedsTopBarTonalElevationPreference.fromPreferences(this),
         feedsGroupListExpand = FeedsGroupListExpandPreference.fromPreferences(this),
         feedsGroupListTonalElevation = FeedsGroupListTonalElevationPreference.fromPreferences(this),
+        feedsFonts = FeedsFontsPreference.fromPreferences(this),
+        feedsTextFontSize = FeedsTextFontSizePreference.fromPreferences(this),
 
         // Flow page
         flowFilterBarStyle = FlowFilterBarStylePreference.fromPreferences(this),
@@ -50,6 +52,8 @@ fun Preferences.toSettings(): Settings {
         flowArticleListReadIndicator = FlowArticleReadIndicatorPreference.fromPreferences(this),
         flowArticleListTonalElevation = FlowArticleListTonalElevationPreference.fromPreferences(this),
         flowSortUnreadArticles = SortUnreadArticlesPreference.fromPreferences(this),
+        flowFonts = FlowFontsPreference.fromPreferences(this),
+        flowTextFontSize = FlowTextFontSizePreference.fromPreferences(this),
 
         // Reading page
         readingRenderer = ReadingRendererPreference.fromPreferences(this),

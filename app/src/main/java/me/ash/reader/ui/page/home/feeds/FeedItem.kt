@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import me.ash.reader.domain.model.feed.Feed
 import me.ash.reader.ui.component.FeedIcon
 import me.ash.reader.ui.component.base.RYExtensibleVisibility
+import me.ash.reader.ui.component.withFeedsListStyle
 import me.ash.reader.ui.page.home.feeds.drawer.feed.FeedOptionViewModel
 
 @Composable
@@ -78,7 +79,7 @@ private fun FeedItemImpl(
                             trim = LineHeightStyle.Trim.Both,
                             alignment = LineHeightStyle.Alignment.Center
                         )
-                    ),
+                    ).withFeedsListStyle(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -91,7 +92,7 @@ private fun FeedItemImpl(
                     content = {
                         Text(
                             text = feed.important.toString(),
-                            style = MaterialTheme.typography.labelSmall
+                            style = MaterialTheme.typography.labelSmall.withFeedsListStyle()
                         )
                     },
                 )

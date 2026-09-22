@@ -87,6 +87,8 @@ class SettingsProvider @Inject constructor(
             LocalFeedsFilterBarStyle provides settings.feedsFilterBarStyle,
             LocalFeedsFilterBarPadding provides settings.feedsFilterBarPadding,
             LocalFeedsFilterBarTonalElevation provides settings.feedsFilterBarTonalElevation,
+            LocalFeedsFonts provides settings.feedsFonts,
+            LocalFeedsTextFontSize provides settings.feedsTextFontSize,
 
             // Flow page
             LocalFlowTopBarTonalElevation provides settings.flowTopBarTonalElevation,
@@ -102,6 +104,8 @@ class SettingsProvider @Inject constructor(
             LocalFlowFilterBarTonalElevation provides settings.flowFilterBarTonalElevation,
             LocalFlowArticleListReadIndicator provides settings.flowArticleListReadIndicator,
             LocalSortUnreadArticles provides settings.flowSortUnreadArticles,
+            LocalFlowFonts provides settings.flowFonts,
+            LocalFlowTextFontSize provides settings.flowTextFontSize,
 
             // Reading page
             LocalReadingRenderer provides settings.readingRenderer,

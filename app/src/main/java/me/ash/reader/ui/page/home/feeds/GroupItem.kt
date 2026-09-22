@@ -26,6 +26,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import me.ash.reader.R
 import me.ash.reader.domain.model.group.Group
 import me.ash.reader.domain.model.group.GroupWithFeed
+import me.ash.reader.ui.component.withFeedsListStyle
 import me.ash.reader.ui.page.home.feeds.drawer.group.GroupOptionViewModel
 import me.ash.reader.ui.theme.Shape32
 import me.ash.reader.ui.theme.ShapeTop32
@@ -66,7 +67,7 @@ fun GroupItem(
                     .weight(1f)
                     .padding(horizontal = 28.dp),
                 text = group.name,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.withFeedsListStyle(),
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

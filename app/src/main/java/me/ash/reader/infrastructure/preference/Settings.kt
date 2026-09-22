@@ -28,6 +28,8 @@ data class Settings(
     val feedsTopBarTonalElevation: FeedsTopBarTonalElevationPreference = FeedsTopBarTonalElevationPreference.default,
     val feedsGroupListExpand: FeedsGroupListExpandPreference = FeedsGroupListExpandPreference.default,
     val feedsGroupListTonalElevation: FeedsGroupListTonalElevationPreference = FeedsGroupListTonalElevationPreference.default,
+    val feedsFonts: ListFontsPreference = ListFontsPreference.default,
+    val feedsTextFontSize: Int = FeedsTextFontSizePreference.default,
 
     // Flow page
     val flowFilterBarStyle: FlowFilterBarStylePreference = FlowFilterBarStylePreference.default,
@@ -43,6 +45,8 @@ data class Settings(
     val flowArticleListTonalElevation: FlowArticleListTonalElevationPreference = FlowArticleListTonalElevationPreference.default,
     val flowArticleListReadIndicator: FlowArticleReadIndicatorPreference = FlowArticleReadIndicatorPreference.default,
     val flowSortUnreadArticles: SortUnreadArticlesPreference = SortUnreadArticlesPreference.default,
+    val flowFonts: ListFontsPreference = ListFontsPreference.default,
+    val flowTextFontSize: Int = FlowTextFontSizePreference.default,
 
     // Reading page
     val readingRenderer: ReadingRendererPreference = ReadingRendererPreference.default,
