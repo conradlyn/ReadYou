@@ -36,6 +36,9 @@ import me.ash.reader.ui.theme.palette.onDark
  *   centred content column instead of being pinned to the left edge. Deliberately opt-in and
  *   defaulted to zero: this composable is also used inside a pane (FlowPage) and inside the style
  *   previews, where a window-width gutter would over-inset.
+ * @param leading optional extra action pinned to the left of the filter items, inside the same
+ *   padding as they are. Defaulted to null so every existing call site keeps the upstream layout,
+ *   and so a merge from upstream sees at most a two-line conflict here.
  */
 @Composable
 fun FilterBar(
@@ -46,6 +49,7 @@ fun FilterBar(
     filterBarPadding: Dp,
     filterBarTonalElevation: Dp,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    leading: (@Composable () -> Unit)? = null,
     filterOnClick: (Filter) -> Unit = {},
 ) {
     val view = LocalView.current
@@ -78,6 +82,7 @@ fun FilterBar(
         ) {
 
             Spacer(modifier = Modifier.width(filterBarPadding))
+            leading?.invoke()
             Filter.values.forEach { item ->
                 NavigationBarItem(
                     modifier = Modifier.height(containerHeight),

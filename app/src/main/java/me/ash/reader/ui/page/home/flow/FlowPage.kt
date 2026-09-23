@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -74,6 +75,7 @@ import me.ash.reader.R
 import me.ash.reader.domain.data.PagerData
 import me.ash.reader.domain.model.article.ArticleFlowItem
 import me.ash.reader.domain.model.article.ArticleWithFeed
+import me.ash.reader.domain.model.general.MarkAsReadConditions
 import me.ash.reader.infrastructure.preference.LocalFlowArticleListDateStickyHeader
 import me.ash.reader.infrastructure.preference.LocalFlowArticleListFeedIcon
 import me.ash.reader.infrastructure.preference.LocalFlowArticleListTonalElevation
@@ -81,12 +83,15 @@ import me.ash.reader.infrastructure.preference.LocalFlowFilterBarPadding
 import me.ash.reader.infrastructure.preference.LocalFlowFilterBarStyle
 import me.ash.reader.infrastructure.preference.LocalFlowFilterBarTonalElevation
 import me.ash.reader.infrastructure.preference.LocalFlowTopBarTonalElevation
+import me.ash.reader.infrastructure.preference.LocalMarkAllAsReadWithoutConfirm
+import me.ash.reader.infrastructure.preference.LocalMarkAsReadButtonPosition
 import me.ash.reader.infrastructure.preference.LocalMarkAsReadOnScroll
 import me.ash.reader.infrastructure.preference.LocalOpenLink
 import me.ash.reader.infrastructure.preference.LocalOpenLinkSpecificBrowser
 import me.ash.reader.infrastructure.preference.LocalSettings
 import me.ash.reader.infrastructure.preference.LocalSharedContent
 import me.ash.reader.infrastructure.preference.LocalSortUnreadArticles
+import me.ash.reader.infrastructure.preference.MarkAsReadButtonPositionPreference
 import me.ash.reader.infrastructure.preference.PullToLoadNextFeedPreference
 import me.ash.reader.infrastructure.preference.SortUnreadArticlesPreference
 import me.ash.reader.ui.component.FilterBar
@@ -132,6 +137,8 @@ fun FlowPage(
     val filterBarTonalElevation = LocalFlowFilterBarTonalElevation.current
     val sharedContent = LocalSharedContent.current
     val markAsReadOnScroll = LocalMarkAsReadOnScroll.current.value
+    val markAllAsReadWithoutConfirm = LocalMarkAllAsReadWithoutConfirm.current.value
+    val markAsReadButtonPosition = LocalMarkAsReadButtonPosition.current
     val context = LocalContext.current
 
     val openLink = LocalOpenLink.current
@@ -164,6 +171,51 @@ fun FlowPage(
     val focusRequester = remember { FocusRequester() }
     var markAsRead by remember { mutableStateOf(false) }
     var onSearch by rememberSaveable { mutableStateOf(false) }
+
+    // Shared by both placements of the button, so the two can never drift apart.
+    val onMarkAsReadClick: () -> Unit = {
+        when {
+            // Already unfolded: the button doubles as a dismiss for the condition bar.
+            markAsRead -> markAsRead = false
+            // Opt-in shortcut: straight to "everything is read", with no condition bar in between.
+            markAllAsReadWithoutConfirm -> {
+                viewModel.updateReadStatus(
+                    groupId = filterUiState.group?.id,
+                    feedId = filterUiState.feed?.id,
+                    articleId = null,
+                    conditions = MarkAsReadConditions.All,
+                    isUnread = false,
+                )
+                onSearch = false
+            }
+            else -> {
+                scope
+                    .launch {
+                        if (listState.firstVisibleItemIndex != 0) {
+                            listState.animateScrollToItem(0)
+                        }
+                    }
+                    .invokeOnCompletion {
+                        markAsRead = true
+                        onSearch = false
+                    }
+            }
+        }
+    }
+
+    // Null when the button lives in the top bar, so the filter bar adds no leading item at all.
+    val markAsReadButtonLeading: (@Composable () -> Unit)? =
+        if (markAsReadButtonPosition == MarkAsReadButtonPositionPreference.Bottom) {
+            {
+                MarkAsReadIconButton(
+                    visible = !filterUiState.filter.isStarred(),
+                    active = markAsRead,
+                    onClick = onMarkAsReadClick,
+                )
+            }
+        } else {
+            null
+        }
 
     var currentPullToLoadState: PullToLoadState? by remember { mutableStateOf(null) }
     var currentLoadAction: LoadAction? by remember { mutableStateOf(null) }
@@ -377,32 +429,14 @@ fun FlowPage(
                             }
                         },
                         actions = {
-                            RYExtensibleVisibility(visible = !filterUiState.filter.isStarred()) {
-                                FeedbackIconButton(
-                                    imageVector = Icons.Rounded.DoneAll,
-                                    contentDescription = stringResource(R.string.mark_all_as_read),
-                                    tint =
-                                        if (markAsRead) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        },
-                                ) {
-                                    if (markAsRead) {
-                                        markAsRead = false
-                                    } else {
-                                        scope
-                                            .launch {
-                                                if (listState.firstVisibleItemIndex != 0) {
-                                                    listState.animateScrollToItem(0)
-                                                }
-                                            }
-                                            .invokeOnCompletion {
-                                                markAsRead = true
-                                                onSearch = false
-                                            }
-                                    }
-                                }
+                            if (markAsReadButtonPosition ==
+                                MarkAsReadButtonPositionPreference.Top
+                            ) {
+                                MarkAsReadIconButton(
+                                    visible = !filterUiState.filter.isStarred(),
+                                    active = markAsRead,
+                                    onClick = onMarkAsReadClick,
+                                )
                             }
                             FeedbackIconButton(
                                 imageVector = Icons.Rounded.Search,
@@ -477,20 +511,6 @@ fun FlowPage(
                     )
                 }
 
-                RYExtensibleVisibility(markAsRead) {
-                    BackHandler(markAsRead) { markAsRead = false }
-
-                    MarkAsReadBar {
-                        markAsRead = false
-                        viewModel.updateReadStatus(
-                            groupId = filterUiState.group?.id,
-                            feedId = filterUiState.feed?.id,
-                            articleId = null,
-                            conditions = it,
-                            isUnread = false,
-                        )
-                    }
-                }
                 val contentTransitionVertical =
                     sharedYAxisTransitionExpressive(direction = Direction.Forward)
                 val contentTransitionBackward =
@@ -708,26 +728,45 @@ fun FlowPage(
             },
             floatingActionButtonPosition = FabPosition.Center,
             bottomBar = {
-                FilterBar(
-                    modifier =
-                        with(sharedTransitionScope) {
-                            Modifier.sharedElement(
-                                sharedContentState = rememberSharedContentState("filterBar"),
-                                animatedVisibilityScope = animatedVisibilityScope,
+                Column {
+                    // The condition bar unfolds upwards out of the filter bar instead of hanging
+                    // under the top app bar, so it opens right above the button that opened it.
+                    RYExtensibleVisibility(markAsRead) {
+                        BackHandler(markAsRead) { markAsRead = false }
+
+                        MarkAsReadBar {
+                            markAsRead = false
+                            viewModel.updateReadStatus(
+                                groupId = filterUiState.group?.id,
+                                feedId = filterUiState.feed?.id,
+                                articleId = null,
+                                conditions = it,
+                                isUnread = false,
                             )
-                        },
-                    filter = filterUiState.filter,
-                    filterBarStyle = filterBarStyle.value,
-                    filterBarFilled = true,
-                    filterBarPadding = filterBarPadding.dp,
-                    filterBarTonalElevation = filterBarTonalElevation.value.dp,
-                ) {
-                    if (filterUiState.filter != it) {
-                        viewModel.changeFilter(filterUiState.copy(filter = it))
-                    } else {
-                        scope.launch {
-                            if (listState.firstVisibleItemIndex != 0) {
-                                listState.animateScrollToItem(0)
+                        }
+                    }
+                    FilterBar(
+                        modifier =
+                            with(sharedTransitionScope) {
+                                Modifier.sharedElement(
+                                    sharedContentState = rememberSharedContentState("filterBar"),
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                )
+                            },
+                        filter = filterUiState.filter,
+                        filterBarStyle = filterBarStyle.value,
+                        filterBarFilled = true,
+                        filterBarPadding = filterBarPadding.dp,
+                        filterBarTonalElevation = filterBarTonalElevation.value.dp,
+                        leading = markAsReadButtonLeading,
+                    ) {
+                        if (filterUiState.filter != it) {
+                            viewModel.changeFilter(filterUiState.copy(filter = it))
+                        } else {
+                            scope.launch {
+                                if (listState.firstVisibleItemIndex != 0) {
+                                    listState.animateScrollToItem(0)
+                                }
                             }
                         }
                     }
@@ -746,5 +785,35 @@ fun FlowPage(
                         ),
             )
         }
+    }
+}
+
+/**
+ * The "mark as read" (DoneAll) action, drawn identically wherever the user placed it.
+ *
+ * Note the [RYExtensibleVisibility] wrapper. A layout modifier applied straight to a
+ * [FeedbackIconButton] lands on the inner `Icon` of its 40dp `IconButton` rather than on the button
+ * itself, so a padding as large as the tablet gutter squeezes the glyph to zero width and the
+ * button silently disappears. FeedsPage hit exactly that. Keeping the animation on the outside
+ * means neither placement can reintroduce it.
+ */
+@Composable
+private fun MarkAsReadIconButton(
+    visible: Boolean,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    RYExtensibleVisibility(visible = visible) {
+        FeedbackIconButton(
+            imageVector = Icons.Rounded.DoneAll,
+            contentDescription = stringResource(R.string.mark_all_as_read),
+            tint =
+                if (active) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            onClick = onClick,
+        )
     }
 }

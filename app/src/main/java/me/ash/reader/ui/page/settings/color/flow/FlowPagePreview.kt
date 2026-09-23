@@ -47,6 +47,7 @@ fun FlowPagePreview(
     filterBarFilled: Boolean,
     filterBarPadding: Dp,
     filterBarTonalElevation: Dp,
+    markAsReadButtonAtBottom: Boolean,
 ) {
     var filter by remember { mutableStateOf(Filter.Unread) }
 
@@ -81,11 +82,13 @@ fun FlowPagePreview(
                 ) {}
             },
             actions = {
-                FeedbackIconButton(
-                    imageVector = Icons.Rounded.DoneAll,
-                    contentDescription = stringResource(R.string.mark_all_as_read),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                ) {}
+                if (!markAsReadButtonAtBottom) {
+                    FeedbackIconButton(
+                        imageVector = Icons.Rounded.DoneAll,
+                        contentDescription = stringResource(R.string.mark_all_as_read),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    ) {}
+                }
                 FeedbackIconButton(
                     imageVector = Icons.Rounded.Search,
                     contentDescription = stringResource(R.string.search),
@@ -120,6 +123,18 @@ fun FlowPagePreview(
             filterBarFilled = filterBarFilled,
             filterBarPadding = filterBarPadding,
             filterBarTonalElevation = filterBarTonalElevation,
+            leading =
+                if (markAsReadButtonAtBottom) {
+                    {
+                        FeedbackIconButton(
+                            imageVector = Icons.Rounded.DoneAll,
+                            contentDescription = stringResource(R.string.mark_all_as_read),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        ) {}
+                    }
+                } else {
+                    null
+                },
         ) {
             filter = it
         }

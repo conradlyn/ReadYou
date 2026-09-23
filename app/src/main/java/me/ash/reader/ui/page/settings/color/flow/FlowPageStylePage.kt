@@ -41,6 +41,8 @@ fun FlowPageStylePage(
     val articleListTonalElevation = LocalFlowArticleListTonalElevation.current
     val articleListReadIndicator = LocalFlowArticleListReadIndicator.current
     val sortUnreadArticles = LocalSortUnreadArticles.current
+    val markAsReadButtonPosition = LocalMarkAsReadButtonPosition.current
+    val markAllAsReadWithoutConfirm = LocalMarkAllAsReadWithoutConfirm.current
     val fonts = LocalFlowFonts.current
     val fontSize = LocalFlowTextFontSize.current
 
@@ -57,6 +59,7 @@ fun FlowPageStylePage(
     var articleListReadIndicatorDialogVisible by remember { mutableStateOf(false) }
     var showArticleListDescDialog by remember { mutableStateOf(false) }
     var showPullToLoadDialog by remember { mutableStateOf(false) }
+    var showMarkAsReadButtonPositionDialog by remember { mutableStateOf(false) }
 
     var showSortUnreadArticlesDialog by remember { mutableStateOf(false) }
 
@@ -105,6 +108,9 @@ fun FlowPageStylePage(
                             filterBarFilled = true,
                             filterBarPadding = filterBarPadding.dp,
                             filterBarTonalElevation = filterBarTonalElevation.value.dp,
+                            markAsReadButtonAtBottom =
+                                markAsReadButtonPosition ==
+                                    MarkAsReadButtonPositionPreference.Bottom,
                         )
                     }
                     Spacer(modifier = Modifier.height(24.dp))
@@ -138,9 +144,8 @@ fun FlowPageStylePage(
                     )
                     SettingItem(
                         title = stringResource(R.string.mark_as_read_button_position),
-                        desc = stringResource(R.string.top),
-                        enabled = false,
-                        onClick = {},
+                        desc = markAsReadButtonPosition.description,
+                        onClick = { showMarkAsReadButtonPositionDialog = true },
                     ) {}
                     SettingItem(
                         title = stringResource(R.string.tonal_elevation),
@@ -279,6 +284,14 @@ fun FlowPageStylePage(
                             filterBarTonalElevationDialogVisible = true
                         },
                     ) {}
+                    SettingItem(
+                        title = stringResource(R.string.mark_all_as_read_without_confirm),
+                        onClick = { (!markAllAsReadWithoutConfirm).put(context, scope) },
+                    ) {
+                        RYSwitch(activated = markAllAsReadWithoutConfirm.value) {
+                            (!markAllAsReadWithoutConfirm).put(context, scope)
+                        }
+                    }
                 }
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
@@ -425,6 +438,22 @@ fun FlowPageStylePage(
         },
         onDismissRequest = {
             showPullToLoadDialog = false
+        }
+    )
+
+    RadioDialog(
+        visible = showMarkAsReadButtonPositionDialog,
+        title = stringResource(R.string.mark_as_read_button_position),
+        options = MarkAsReadButtonPositionPreference.values.map {
+            RadioDialogOption(
+                text = it.description,
+                selected = it == markAsReadButtonPosition,
+            ) {
+                it.put(context, scope)
+            }
+        },
+        onDismissRequest = {
+            showMarkAsReadButtonPositionDialog = false
         }
     )
 
