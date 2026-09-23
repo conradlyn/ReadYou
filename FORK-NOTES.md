@@ -163,8 +163,16 @@ navigationIcon = {
 上游合并时要看的两点：
 
 - [ ] `ui/component/FilterBar.kt` 的 `leading` 是**自有可选参数**（默认 `null`，其余调用点不传）。
-      它必须在 Row 内、`Spacer(filterBarPadding)` **之后**调用；放到之前，按钮会跑到自适应 gutter
-      外侧，平板上与内容列错位。上游若重写 `FilterBar`，把 `leading?.invoke()` 这一行搬回去即可。
+      它必须在 Row 内、`Spacer(filterBarPadding)` **之后**，并且用 `Modifier.weight(1f)` 的 `Box`
+      裹住、内容居中。放到 Spacer 之前，按钮会跑到自适应 gutter 外侧，平板上与内容列错位。
+      上游若重写 `FilterBar`，把 `leading?.let { Box(Modifier.weight(1f), Center) { it() } }`
+      这一整段搬回去即可。
+- [ ] **每个 `NavigationBarItem` 上的 `Modifier.weight(1f)` 不能删。** `NavigationBarItem` 只有在
+      `NavigationBar`（它本身就是个会给兄弟项分配权重的 Row）里才与同级等分；放进本 fork 这个普通
+      `Row` 时它按自身内容宽度排布。少了这个权重，4 项会退化成"左端一个 40dp 小图标 + 三个被拉到
+      很开的过滤项"—— 这正是它看起来难看的原因。这条是 fork 特有的排布前提，与上游无关。
+- [ ] **左槽在「收藏」筛选下返回 `null`，不是"渲染但不可见"。** 归零的是槽位本身，三项才会重新
+      均分；若改成隐藏，那一格会一直空着。
 - [ ] 上游的 `mark_as_read_button_position` 字符串还在（那个设置项原本是 `enabled = false` 的占位，
       没有对应的 DataStore 键）。本 fork 用**自己的键** `markAsReadButtonPosition` 实现了它。
       若上游将来真做同一项，两个键会语义重叠——先看上游的取值与默认值，再决定保留哪一个，
