@@ -16,6 +16,12 @@ on:
   push:
     branches:
       - main
+    # Documentation-only pushes are deliberately excluded: cutting a release whose APK is identical
+    # to the previous one is noise on the releases page. Note this makes the workflow skip **only**
+    # when every changed file matches; a push that touches code *and* a .md still builds.
+    # workflow_dispatch below is unaffected, so a manual run can always force a release.
+    paths-ignore:
+      - "**/*.md"
   workflow_dispatch:
 
 # Needed to create the tag ref and the release. Least privilege beyond that.
