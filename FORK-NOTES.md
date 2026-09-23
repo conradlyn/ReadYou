@@ -6,7 +6,7 @@
 跟随上游时不要重读 diff。按下面的顺序做，每一步都有明确的"看什么、为什么"。
 
 - **基线**：上游合并点 `d2b979cc`
-- **本文档更新于**：2026-09-23（发布 `v0.16.2-tablet.3`）
+- **本文档更新于**：2026-09-23（`v0.16.2-tablet.3` 发布后修掉顶部栏图标消失，见 §2.5）
 
 ---
 
@@ -93,12 +93,39 @@
 
 ---
 
+### 2.5 改顶部栏时必须知道的陷阱（会让按钮凭空消失）
+
+`FeedbackIconButton(modifier = ...)` 的 `modifier` **不是加在按钮上的**，是加在里面的 `Icon` 上的，
+而那个 `Icon` 位于一个固定 40dp 的 `IconButton` 内。往这个 `modifier` 上加 `padding`，只要 padding
+宽过 40dp，`Icon` 收到的约束就被压到 0，图标宽度即 0 —— **看不见，但仍然占位、仍然可点**。
+
+`v0.16.2-tablet.3` 就是这样丢掉了 Feeds 的齿轮按钮和"订阅"按钮：gutter 在 Compact 下恒为 0，
+所以手机上一切正常，而窗口宽过约 720dp 之后图标宽度归零。**这类 bug 只在平板上出现，手机回归测不出来。**
+
+正确写法是**给外面的容器加内边距**，不要碰图标自己的 `modifier`：
+
+```kotlin
+navigationIcon = {
+    Box(modifier = Modifier.padding(start = adaptiveGutter)) {
+        FeedbackIconButton(...)  // 自己的 modifier 只放 .size()
+    }
+}
+```
+
+`Box` 拿到的约束是松的，内边距只占宽度、不压内容。`RYScaffold` 里的隐式顶部栏本来就是这么写的
+（所以那 20 多个页面没这个 bug），出问题的只有 `FeedsPage`——它是唯一自己传 `topBar` 的页面。
+
+**同理适用于任何"modifier 被转交给固定尺寸子节点"的组件**：加布局类 modifier 前先看它在哪一层生效。
+
+---
+
 ## 3. 真机核验清单
 
 模拟器用 Android Studio 的 Resizable 设备，手动拖宽度跨越 600 / 840dp。
 
 - [ ] **手机竖屏**：Feeds / Flow / 阅读 / 设置 —— 与改动前逐一比对（**核心回归项**）
-- [ ] **平板竖屏（~800dp）**：Feeds 内容居中，两侧约 80dp；顶部两个图标与内容列同宽
+- [ ] **平板竖屏（~800dp）**：Feeds 内容居中，两侧约 80dp；顶部两个图标与内容列同宽**且确实可见**（§2.5）
+- [ ] **平板（任何 > 720dp 的宽度）**：Feeds 顶部齿轮与"订阅"图标都在 —— `tablet.3` 在这两个位置是空白
 - [ ] **平板横屏（~1280dp）**：两侧约 320dp；**逐个**打开设置子页（accounts ×3、color ×10、
       interaction、languages、tips ×2、troubleshooting、startup）确认都居中
 - [ ] **双栏（关键）**：Flow 列**不被额外缩进**，阅读列按上游逻辑居中
@@ -117,9 +144,9 @@
    而该约束包含系统栏内边距；再往内才是 Scaffold 自己的 `calculateStartPadding`。
    横屏 + 三键导航（侧边导航栏）时会两侧不等，内容列宽 640 会变成 ~592 且中心偏 ~24dp。
    **要修的话**：在 `RYScaffold` 里减掉 `WindowInsets.systemBars` 的左右内边距再算 gutter。
-2. **显式 `topBar`（Feeds / Flow / Startup）不参与内容限宽**。Feeds 的两个图标已单独对齐；
-   Flow 的 `LargeTopAppBar` 标题、Startup 页的 FAB 仍是窗口对齐。原因：整条 bar 可点击（回顶），
-   缩窄会拿走点击区域。
+2. **显式 `topBar`（Feeds / Flow / Startup）不参与内容限宽**。Feeds 的两个图标已单独对齐
+   （写法见 §2.5，不要改成给图标加 padding）；Flow 的 `LargeTopAppBar` 标题、Startup 页的 FAB
+   仍是窗口对齐。原因：整条 bar 可点击（回顶），缩窄会拿走点击区域。
 3. **`FlowPage` 的 `FilterBar` 未接 `contentPadding`**，因为它在 pane 里（gutter 恒为 0）。
    只有"Expanded 且单栏"这种少见形态下，底部栏会是通栏而内容被限宽。
 4. **Feeds ↔ Flow 的 `filterBar` sharedElement 过渡**：两侧 gutter 不同（窗口宽 vs pane 宽），
