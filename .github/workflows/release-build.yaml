@@ -64,14 +64,18 @@ jobs:
             exit 1
           fi
           printf 'asset: %s\n' "${apks[@]}"
+          # Markdown is whitespace sensitive: a continuation line indented by four spaces renders
+          # as a code block, which is what a folded double-quoted argument produced here - the bold
+          # markers showed up literally and the paragraph came out monospaced. Build the notes from
+          # explicit newlines instead, so the indentation of this script stops being content.
+          notes="Built from \`${GITHUB_SHA}\` by the **${GITHUB_WORKFLOW}** workflow."
+          notes="${notes}"$'\n\n'"Signed with the debug keystore committed at \`signature/reader.keystore\`,"
+          notes="${notes}"$'\n'"so it will not install over an F-Droid or Google Play build. Uninstall those first."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${apks[@]}" --clobber
           else
             gh release create "$TAG" "${apks[@]}" \
               --title "$TAG" \
               --prerelease \
-              --notes "Built from \`${GITHUB_SHA}\` by the **${GITHUB_WORKFLOW}** workflow.
-
-          Signed with the debug keystore committed at \`signature/reader.keystore\`, so it will not
-          install over an F-Droid or Google Play build. Uninstall those first."
+              --notes "$notes"
           fi
