@@ -69,6 +69,7 @@ import me.ash.reader.infrastructure.preference.LocalFeedsGroupListTonalElevation
 import me.ash.reader.infrastructure.preference.LocalFeedsTopBarTonalElevation
 import me.ash.reader.infrastructure.preference.LocalNewVersionNumber
 import me.ash.reader.infrastructure.preference.LocalSkipVersionNumber
+import me.ash.reader.ui.adaptive.rememberAdaptiveContentGutter
 import me.ash.reader.ui.adaptive.rememberAdaptiveContentPadding
 import me.ash.reader.ui.component.FilterBar
 import me.ash.reader.ui.component.base.DisplayText
@@ -183,6 +184,10 @@ fun FeedsPage(
         topBarTonalElevation = topBarTonalElevation.value.dp,
         //        containerTonalElevation = groupListTonalElevation.value.dp,
         topBar = {
+            // Lines the two icons up with the centred content column below them. Only the icons
+            // move: the bar itself stays full width, so tapping anywhere on it still scrolls the
+            // list back to the top.
+            val adaptiveGutter = rememberAdaptiveContentGutter()
             TopAppBar(
                 modifier =
                     Modifier.clickable(
@@ -199,7 +204,7 @@ fun FeedsPage(
                 title = {},
                 navigationIcon = {
                     FeedbackIconButton(
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.padding(start = adaptiveGutter).size(20.dp),
                         imageVector = Icons.Outlined.Settings,
                         contentDescription = stringResource(R.string.settings),
                         tint = MaterialTheme.colorScheme.onSurface,
@@ -211,6 +216,7 @@ fun FeedsPage(
                 actions = {
                     if (subscribeViewModel.rssService.get().addSubscription) {
                         FeedbackIconButton(
+                            modifier = Modifier.padding(end = adaptiveGutter),
                             imageVector = Icons.Rounded.Add,
                             contentDescription = stringResource(R.string.subscribe),
                             tint = MaterialTheme.colorScheme.onSurface,
@@ -233,7 +239,6 @@ fun FeedsPage(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().drawVerticalScrollIndicator(listState),
                     state = listState,
-                    contentPadding = rememberAdaptiveContentPadding(),
                 ) {
                     item {
                         DisplayText(text = feedsUiState.account?.name ?: "", desc = "") {

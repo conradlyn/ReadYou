@@ -24,10 +24,12 @@ enum class AppSizeClass(val minWidthDp: Int) {
         /**
          * Returns the bucket [widthDp] falls into.
          *
-         * Never throws: [Compact] has a lower bound of 0, so it always matches and acts as the
-         * floor. A width of 0 (container size not yet known) therefore resolves to [Compact],
-         * which means "do not adapt" rather than "adapt to something arbitrary".
+         * Never throws: [Compact] has a lower bound of 0 and is the fallback, so it matches even
+         * when the caller passes a nonsense width. A width of 0 (container size not yet known)
+         * therefore resolves to [Compact], which means "do not adapt" rather than "adapt to
+         * something arbitrary".
          */
-        fun fromWidthDp(widthDp: Int): AppSizeClass = entries.last { widthDp >= it.minWidthDp }
+        fun fromWidthDp(widthDp: Int): AppSizeClass =
+            entries.lastOrNull { widthDp >= it.minWidthDp } ?: Compact
     }
 }
