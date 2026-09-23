@@ -6,7 +6,7 @@
 跟随上游时不要重读 diff。按下面的顺序做，每一步都有明确的"看什么、为什么"。
 
 - **基线**：上游合并点 `d2b979cc`
-- **本文档更新于**：2026-09-23（`v0.16.2-tablet.3` 之后修掉顶部栏图标消失 → §2.5；发布改为 push 全自动 → §7）
+- **本文档更新于**：2026-09-23（发布改为 push 全自动 → §7；上游同步流程 + 别点网页 Sync fork → §8）
 
 ---
 
@@ -28,7 +28,7 @@
 
 ---
 
-## 2. rebase 后逐项核验（不要跳）
+## 2. 同步上游后逐项核验（不要跳；merge 与 rebase 都适用）
 
 ### 2.1 结构是否还在
 
@@ -237,3 +237,84 @@ navigationIcon = {
   序号会从头开始（`v0.16.3-tablet.1`），这是刻意的：序号只表示"本 version 内的第几个预览包"。
 - **半成品排查**：若某次 run 建了 tag 但没挂上 release，重跑该 run 不会复用旧 tag（序号已 +1），
   会多出一个空 tag —— 需要手工清理，或直接用 `release-build.yaml` 对着那个 tag 补发。
+
+---
+
+## 8. 上游更新后怎么同步（别点网页那个 Sync fork）
+
+### 8.1 结论
+
+**GitHub 网页的 `Sync fork` → `Update branch` 在本 fork 上是不能用的**，因为它只做 fast-forward。
+本 fork 的 main 有自己的 21 个提交，一旦上游也有新提交，分支就处于分叉状态，
+GitHub 会**拒绝同步**，只给两个出口：**`Discard N commits`**（灾难）或者让你去开 PR。
+
+**`Discard` 等于 `git reset --hard upstream/main` + force push —— 本 fork 的提交会从 main 上被抹掉。**
+（社区里就有人点了它，然后撞上 `Cannot force-push to this branch`。）
+
+官方文档的原文（[Syncing a fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork)）
+其实写得很清楚：推荐的同步方式是本地的 `git fetch upstream` → `git merge upstream/main` → `git push`，
+它 "syncs your fork's default branch with the upstream repository **without losing your local changes**"；
+而网页版在上游改动有冲突时只会 "prompt you to create a pull request to resolve the conflicts"。
+`gh repo sync` 同理 —— 冲突时它自己也同步不了，只能 `--force` 覆盖，那也是放弃自己的改动。
+
+### 8.2 为什么是 merge，不是 rebase
+
+本 fork 已经发过 `v0.16.2-tablet.1~4`，**release tag 指向具体提交**：
+
+- **merge**：不改写历史，tag 指向的提交仍在 main 的祖先链上，`git log v0.16.2-tablet.4` 一路可读；不需要 force push。
+- **rebase**：重写这些提交 → tag 变悬空引用、必须 force push 才能推上去，已发布的 APK 与提交的对应关系也会错位。
+
+代价只是多一个 merge commit。**这个 fork 选 merge。**
+
+### 8.3 操作步骤
+
+```bash
+cd /d/VibeCoding/Git/ReadYou
+
+# 0) 一次性：加远端（已完成，git remote -v 应能看到 upstream）
+git remote add upstream https://github.com/ReadYouApp/ReadYou.git
+
+# 1) 拉上游。本机必须清空代理环境变量走直连，否则报 CONNECT tunnel failed, response 502
+NOPROXY="env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY"
+$NOPROXY git -c http.schannelCheckRevoke=false -c http.version=HTTP/1.1 fetch upstream
+
+# 2) 补写跟踪引用。本机 git 写不进 refs/remotes/upstream/*，fetch 完 git branch -r 是空的
+SHA=$($NOPROXY git -c http.schannelCheckRevoke=false ls-remote upstream refs/heads/main | cut -f1)
+python -c "import os;d='.git/refs/remotes/upstream';os.makedirs(d,exist_ok=True);open(d+'/main','w',newline='\n').write('$SHA\n')"
+git rev-parse upstream/main          # 验证：应等于远端 main
+
+# 3) 先看要合什么，再决定
+git rev-list --left-right --count HEAD...upstream/main      # 左=本地独有，右=上游独有
+git log --oneline HEAD..upstream/main
+git diff --stat HEAD...upstream/main
+git diff --name-only HEAD...upstream/main | grep -E 'RYScaffold\.kt|FeedsPage\.kt|theme/Theme\.kt|Clickable\.kt|build\.gradle\.kts'
+#   ↑ 有输出 = 上游动了本 fork 的挂载点，merge 时按 §2 逐项核验
+
+# 4) 合并（用 --no-verify 避开本机卡死的 husky 钩子）
+git merge upstream/main --no-verify
+
+# 5) 有冲突只可能在本 fork 改过的文件（§1 的挂载点）。
+#    改完 → git add <files> → git merge --continue --no-verify
+
+# 6) 核验：§2 那份清单逐项过（不要跳），尤其是单测与字号基线
+
+# 7) 推送。会自动触发 fork-auto-release，产出下一个 v0.16.2-tablet.N
+git -c http.schannelCheckRevoke=false -c http.version=HTTP/1.1 push origin main
+```
+
+### 8.4 实测基线（2026-09-23）
+
+- **上游 `ReadYouApp/ReadYou` 的 main 停在 `d2b979cc`（2026-08-11），自那以后没有任何新提交。**
+  GitHub compare API 对 `d2b979cc...main` 返回 `identical`（ahead_by = 0）。
+- 也就是说 **本 fork 目前 21 ahead / 0 behind —— 现在没有任何东西需要同步**，
+  这份流程是给上游下次发版时用的。
+- 上游的更新节奏是**低频**：2026-08-11 之后停滞；再往前是 7 月初、6 月初、5 月中各几个提交，
+  其中相当一部分是 Weblate 翻译和 docs/CI 改动。所以"跟着上游跑"的成本本身就不高。
+
+### 8.5 不要做的
+
+- ❌ 点网页 `Sync fork` 里的 **`Discard N commits`** —— 等于放弃本 fork 的全部提交。
+- ❌ `git rebase upstream/main` + `git push --force` —— 会打乱已发布 tag 与提交的对应关系。
+- ❌ 试图让 workflow 全自动 merge 上游 —— 冲突时它只会失败，而 §2 那份核验清单
+  （字号基线、pane 内边距、顶部栏图标）**本来就必须人工过一遍**，自动合进来反而是隐患。
+  可选的是"自动**检测**上游是否更新"，但合并要人来做。
