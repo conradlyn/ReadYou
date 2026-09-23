@@ -29,6 +29,21 @@
 | 3.4 `FORK-NOTES.md` | ✅ 已建 | 仓库根，rebase 检查单 + 已知限制 + 不要做的事 |
 | 3.5 分支重构（`tablet` 分支 + `main` 回上游） | ⏸ 未做 | 属方向性判断，留待决策 |
 
+### 复核更正（发布 `v0.16.2-tablet.3` 时，2026-09-23）
+
+**发布结果**：`v0.16.2-tablet.3`（prerelease；annotated tag `2c07e7ff` → `edfd2de9`），
+asset `ReadYou-0.16.2-edfd2de.apk`（10.59 MB，debug keystore 签名）。
+一次 tag 触发三个工作流全绿：`Build & Release APK`、上游 `Build Commit`、自有 `Unit Tests`。
+
+**本报告有一处误判，在此更正**：
+
+- **A4 不成立。** 用已发布的 `v0.16.2-tablet.1` / `.2` 的 release body **原始值**复核：
+  第二段**没有任何前导空格**，加粗标记也在。YAML 双引号标量折行时就会剥掉续行缩进，
+  那 4 个空格从未进入字符串，所以「渲染成代码块」没有发生。详见 A4 节。
+- **教训**：这份报告里凡是我在本机验证不了的判断，都该像 A2 那样标成**待实测**，
+  而不是用确定语气写成结论。A4 我当时就是这么写错的——这次是靠对比两个已发布 release
+  才发现，不是靠推理。
+
 **三点必须说清楚**：
 
 1. **编译与单测已验证，但验证发生在 CI、不在本机。** 本机没有 JDK、没有 Android SDK
@@ -52,14 +67,14 @@
 - 用 `.withFeedsListStyle()` / `.withFlowListStyle()` 扩展函数挂载字号，而不是改 `Text` 的调用形态 —— 挂载点极轻，rebase 时冲突面小。
 - 复用 `ExternalFonts.loadReadingTypography` 的进程级缓存（`ExternalFonts.kt:52-53, 108-115`），列表项没有引入字体重复加载。已核验，非问题。
 
-**必须先修的 4 个问题**
+**必须先修的问题**（原列 4 项，其中 A4 经复核为误判，见下）
 
 | # | 问题 | 位置 | 性质 |
 |---|---|---|---|
 | A1 | 自适应 `fontScale` 与「列表字号」双重相乘，设置页显示值与实际渲染值不符 | `AdaptiveLayout.kt:95-103` × `ListFonts.kt:45-51` | 行为不一致 |
 | A2 | 替换 `LocalDensity` 丢失 `DensityWithConverter`，Android 14+ 非线性字体缩放可能失效 | `AdaptiveLayout.kt:95-103` | 无障碍回归（**待实测**） |
 | A3 | 自适应宽度取「窗口宽」而非「可用宽」，在 list-detail 的 pane 内会算错 —— 这是现在无法把限宽推广到其余 21 个页面的阻塞点 | `AdaptiveContentPadding.kt:19-30` | 设计缺陷（尚未触发） |
-| A4 | release 说明的多行字符串带 4 空格缩进，GitHub 会渲染成代码块 | `release-build.yaml:70-76` | 显示错误 |
+| A4 | ~~release 说明的多行字符串带 4 空格缩进，GitHub 会渲染成代码块~~ **误判**：YAML 双引号标量折行时已剥掉续行缩进 | `release-build.yaml:70-76` | 无（仅断行位置） |
 
 **最高性价比的优化**
 
@@ -216,25 +231,29 @@ fun rememberAdaptiveContentPadding(vertical: Dp = 0.dp): PaddingValues =
 
 ---
 
-#### A4. release 说明会渲染成代码块
+#### A4. 【误判，已更正】release 说明会渲染成代码块
 
 **位置**：`.github/workflows/release-build.yaml`
 
-```yaml
-              --notes "Built from \`${GITHUB_SHA}\` by the **${GITHUB_WORKFLOW}** workflow.
+**这条是误判。** 我把 YAML 的折行规则想错了：**双引号标量的续行缩进在解析阶段就被剥掉**，
+前导空格从未进入字符串，所以「4 个空格 = 代码块」这个前提不成立。
 
-          Signed with the debug keystore committed at \`signature/reader.keystore\`, so it will not
-          install over an F-Droid or Google Play build. Uninstall those first."
+**证据（2026-09-23 用已发布的 release 复核）**：直接读 `v0.16.2-tablet.1` / `.2` 的 body 原始值
+（这两个是旧写法生成的）：
+
+```
+'Built from `d1e41ca7...` by the **Build & Release APK** workflow.\n\n'
+'Signed with the debug keystore committed at `signature/reader.keystore`, so it will not\n'
+'install over an F-Droid or Google Play build. Uninstall those first.'
 ```
 
-第二段在 shell 双引号内有 10 个前导空格，Markdown 里 4 个空格 = 代码块 → release 页面上这段说明会显示成等宽代码，`**${GITHUB_WORKFLOW}**` 的加粗也不生效，且缩进会被保留。
+第二段**没有任何前导空格**，`**...**` 标记也在 → 加粗生效、没有代码块。
+旧写法唯一的后果是**断行位置跟着源文件缩进漂移**（在 `will not / install over` 这种句中位置断开），
+属排版细节，不是显示错误。
 
-**修复**：把 notes 拆成单行，或写进临时文件用 `--notes-file`：
-
-```bash
-          NOTES="Built from \`${GITHUB_SHA}\` by the **${GITHUB_WORKFLOW}** workflow."$'\n\n'"Signed with..."
-          gh release create "$TAG" "${apks[@]}" --title "$TAG" --prerelease --notes "$NOTES"
-```
+**`6c607655` 的改动仍保留，但理由要改口**：它把断行位置变成显式的，不再取决于脚本缩进；
+`v0.16.2-tablet.3` 的 body 断在逗号处，比旧版可读。**这是可读性改动，不是 bug 修复**，
+提交信息里"渲染成代码块"的说法是错的。
 
 **改动量**：3 行。
 
@@ -546,7 +565,7 @@ git rebase --onto upstream/main d2b979cc tablet
 | 1 | A2 实测：系统最大字号下的非线性缩放是否失效 | 验证 | 0 | — |
 | 2 | A1：删除自适应 `fontScale`（或改为 typography 缩放） | 修 bug | ~15 行 | 低 |
 | 3 | A3：宽度来源改为 `BoxWithConstraints` | 重构 | ~30 行 | 中 |
-| 4 | A4：修 release notes 的缩进 | 修 bug | 3 行 | 无 |
+| 4 | A4：release notes 改为显式换行（**复核后确认原写法无 bug**，属可读性） | 整理 | 3 行 | 无 |
 | 5 | B7：加 2 个单测（含 typography 基线守卫） | 测试 | 2 个新文件 | 无 |
 | 6 | B1：在 `RYScaffold` 挂载限宽（**依赖 3**） | 优化 | ~5 行 | 中 |
 | 7 | B2：顶部栏随内容居中 | 优化 | ~10 行 | 低 |
