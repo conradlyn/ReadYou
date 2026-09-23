@@ -98,4 +98,7 @@ out/
 ### VS Code ###
 .vscode/
 
+### Agent workspace ###
+.workbuddy/
+
 signature
