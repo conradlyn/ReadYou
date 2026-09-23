@@ -1,7 +1,7 @@
 # FORK-NOTES.md — 跟随上游的检查单
 
 这个 fork 相对 `upstream/main` 有两类改动：**平板适配**（本文档）和 **CI**（`manual-build.yaml`、
-`release-build.yaml`，纯新增文件，永不冲突）。
+`release-build.yaml`、`fork-unit-tests.yaml`，纯新增文件，永不冲突）。
 
 跟随上游时不要重读 diff。按下面的顺序做，每一步都有明确的"看什么、为什么"。
 
@@ -24,7 +24,7 @@
 
 **新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass}.kt`、
 `ui/component/ListFonts.kt`、`infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
-`ListFontsPreference.kt`、两个 workflow、3 个单测。
+`ListFontsPreference.kt`、三个 workflow、3 个单测。
 
 ---
 
@@ -44,8 +44,9 @@
 - [ ] **字号基线 `16`**：`FeedsTextFontSizePreference.baseline` / `FlowTextFontSizePreference.baseline`
       假定 `MaterialTheme.typography.titleMedium.fontSize == 16.sp`（M3 默认值）。上游升 Compose BOM、
       或某个 `Typography(...)` 覆写了 `titleMedium`，都会让所有列表字号静默偏移。
-      → **`./gradlew :app:testDebugUnitTest` 里的 `ListFontBaselineTest` 是这条的报警器。**
-      测试跳过（不是通过）说明 guard 没生效，不是"没问题"。
+      → 报警器是 `ListFontBaselineTest`，由自有的 `fork-unit-tests.yaml` 在**每次 push 时**运行
+      （上游的 `testing.yml` 只在 PR 触发，本 fork 不开 PR，靠不住——见 §2.4）。
+      测试**跳过**（不是通过）说明 guard 没生效，不等于"没问题"；该工作流会把跳过判成失败。
 - [ ] `GroupItem.kt`（群组名）与 `ArticleItem.kt`（文章标题）是否仍用 `titleMedium`。
       若改成别的样式，baseline 要跟着改。
 - [ ] `ui/component/ListFonts.kt` 的 `sizeSp / baselineSp` 是否仍是唯一缩放入口。
@@ -61,6 +62,27 @@
 - [ ] `AppSizeClass.fromWidthDp()` 仍从不抛异常（负数、0 都落 `Compact`）。
 - [ ] pane 宽度 < 640dp，所以 `FlowPage` 在双栏里**不被缩进**。若上游把 pane 加宽到 ≥640，
       会出现额外内边距——那是设计如此，但要确认观感可接受。
+
+---
+
+### 2.4 单测在哪里跑（容易误判，别指望错地方）
+
+| 触发 | 工作流 | 跑什么 | 跑不跑单测 |
+|---|---|---|---|
+| push | `fork-unit-tests.yaml`（自有） | `testGithubReleaseUnitTest` | ✅ **这是本 fork 的 guard** |
+| push | `build_commit.yaml`（上游） | `assembleGithubRelease` | ❌ 只编译主源集 |
+| 开 PR | `testing.yml`（上游） | `testGithubReleaseUnitTest` | ✅ |
+| 手动 | `manual-build.yaml`（自有） | assemble 四种 flavor | ❌ |
+
+**上游的两个工作流都不够用**：`testing.yml` 只在 `pull_request` 触发，而本 fork 是**本地 rebase**，
+不开 PR；`build_commit.yaml` 虽然跟着 push 跑，但只 assemble，`app/src/test/` 既不编译也不运行。
+所以在 `fork-unit-tests.yaml` 之前，push 到 main 时单测一次都没跑过——3 个新测试连能不能编译都不知道。
+
+`fork-unit-tests.yaml` 补的就是这个洞，而且多做了一件事：**把「测试被跳过」当成失败**。
+`ListFontBaselineTest` 在纯 JVM 上加载不到 Compose typography 时会 `Assume` 跳过，而跳过的任务
+是绿的——这正好是我最需要看见的状态，所以它不能是绿的。
+
+**另一个理由**：本机没有 JDK / Android SDK，`./gradlew test` 手动也跑不了。CI 是唯一的执行环境。
 
 ---
 
