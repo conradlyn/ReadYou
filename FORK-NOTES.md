@@ -21,10 +21,14 @@
 | 顶部栏图标对齐 | `FeedsPage.kt` 的 `navigationIcon` / `actions` | 只挪图标，不缩整条 bar |
 | 列表字号 | `ui/component/ListFonts.kt` + 6 处 `.withFeeds/FlowListStyle()`（每个 1 行） | 挂载点刻意保持最轻 |
 | 悬停反馈 | `ui/interaction/Clickable.kt` | 触屏无影响，接鼠标才有 |
+| "全部已读"按钮位置 | `FlowPage.kt` 的 `topBar.actions`（Top）/ `bottomBar`（Bottom），按钮本体共用 `MarkAsReadIconButton` | 由偏好 `markAsReadButtonPosition` 决定，**默认 Bottom** = 工具栏左侧 |
+| "全部已读"条件条 | `FlowPage.kt` 的 `bottomBar` 里的 `Column` | 从 content 顶部移到 `FilterBar` **之上**，向上展开（见 §2.7） |
+| 新增偏好 | `ui/ext/DataStoreExt.kt` + `preference/{Settings,Preference,SettingsProvider}.kt` | 加一项要同时改 5 个地方，见 §2.6 |
 
 **新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass}.kt`、
 `ui/component/ListFonts.kt`、`infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
-`ListFontsPreference.kt`、四个 workflow、3 个单测。
+`ListFontsPreference.kt`、`MarkAsReadButtonPositionPreference.kt`、
+`MarkAllAsReadWithoutConfirmPreference.kt`、四个 workflow、3 个单测。
 
 ---
 
@@ -117,6 +121,57 @@ navigationIcon = {
 （所以那 20 多个页面没这个 bug），出问题的只有 `FeedsPage`——它是唯一自己传 `topBar` 的页面。
 
 **同理适用于任何"modifier 被转交给固定尺寸子节点"的组件**：加布局类 modifier 前先看它在哪一层生效。
+
+---
+
+### 2.6 新增一个设置项要改的 5 个地方（漏一个就静默失效）
+
+加一个偏好（布尔 / 整数）**必须**同时改下面 5 处。少任何一处，要么编译不过，要么"设置能点、
+但怎么点都不生效"，而且**没有任何报错**。
+
+| # | 文件 | 改什么 | 漏掉的后果 |
+|---|---|---|---|
+| 1 | `infrastructure/preference/XxxPreference.kt` | 新文件：`sealed class` + `Local` + `put()` + `fromPreferences()` | 编译不过 |
+| 2 | `ui/ext/DataStoreExt.kt` | **两个** companion 各加一个 `const val`，`PreferencesKey.keyList` 加一项，`DataStoreKey.keys` 加一条 | 写入被静默丢弃（见下） |
+| 3 | `preference/Settings.kt` | 加字段 | 编译不过 |
+| 4 | `preference/Preference.kt` | `toSettings()` 里加 `= XxxPreference.fromPreferences(this)` | 编译不过 |
+| 5 | `preference/SettingsProvider.kt` | 加 `LocalXxx provides settings.xxx` | **编译通过、设置页正常、界面永远读到 `default`** |
+
+- 第 5 条最阴：漏了它没有任何编译错误，`LocalXxx.current` 一直返回默认值——表现为"开关能拨、
+  退出去再进来还是关着、功能也不变"。
+- 第 2 条次之：`DataStore<Preferences>.put(key: String, value: Any)` 第一行就是
+  `DataStoreKey.keys[dataStoreKeys]?.key ?: return`。键不在那张表里 = 写入变空操作，**不抛异常**。
+  而 `DataStoreExt.kt` 里有两份 companion（老的 `DataStoreKey` 一份、新的 `PreferencesKey` 一份），
+  两份都要加：`put()` 与 `fromPreferences()` 走老的那份，设置**导出/导入**走新的那份。
+- **布尔偏好还要一个 `operator fun XxxPreference.not()`**（同文件末尾，参照
+  `FlowArticleListFeedIconPreference.kt`），否则设置页里那句典型写法 `(!xxx).put(context, scope)`
+  编译不过。这是本仓库的既有约定，每个布尔偏好都有。
+
+---
+
+### 2.7 "全部已读"按钮：位置是偏好，两处渲染
+
+按钮画在哪个栏里由 `markAsReadButtonPosition` 决定，**两处的 `if` 互斥**：
+
+- `Top` → `topBar.actions` 里的 `MarkAsReadIconButton(...)`
+- `Bottom`（默认）→ `bottomBar` 里 `FilterBar(leading = markAsReadButtonLeading)`
+
+两处共用同一个 `MarkAsReadIconButton`，所以外观和点击行为不会分叉。点击行为也只有一个
+`onMarkAsReadClick`：已展开 → 收起；`markAllAsReadWithoutConfirm` 打开 → 直接全部已读；
+否则 → 展开条件条（7 / 3 / 1 天 + 全部）。
+
+上游合并时要看的两点：
+
+- [ ] `ui/component/FilterBar.kt` 的 `leading` 是**自有可选参数**（默认 `null`，其余调用点不传）。
+      它必须在 Row 内、`Spacer(filterBarPadding)` **之后**调用；放到之前，按钮会跑到自适应 gutter
+      外侧，平板上与内容列错位。上游若重写 `FilterBar`，把 `leading?.invoke()` 这一行搬回去即可。
+- [ ] 上游的 `mark_as_read_button_position` 字符串还在（那个设置项原本是 `enabled = false` 的占位，
+      没有对应的 DataStore 键）。本 fork 用**自己的键** `markAsReadButtonPosition` 实现了它。
+      若上游将来真做同一项，两个键会语义重叠——先看上游的取值与默认值，再决定保留哪一个，
+      别让两份偏好同时生效。
+
+条件条（`MarkAsReadBar`）从 content 顶部移到了 `bottomBar` 的 `Column` 里、`FilterBar` **之上**。
+注意 Scaffold 的 `bottomBar` 槽位**不是浮层**：展开时它会把内容区**推高**，而不是盖在列表上。
 
 ---
 
