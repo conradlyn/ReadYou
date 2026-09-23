@@ -3,6 +3,7 @@ package me.ash.reader.ui.interaction
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -25,9 +26,18 @@ fun Modifier.alphaIndicationClickable(
 ): Modifier {
     val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    // Touch screens never emit a hover interaction, so this is a no-op there. With a mouse - the
+    // magnetic keyboard case and desktop mode on a tablet - it is the only feedback these
+    // modifiers give: without it a pointer user gets no indication that a row is interactive,
+    // because `indication = null` suppresses the ripple too.
+    val isHovered by interactionSource.collectIsHoveredAsState()
     val animatedAlpha by
         animateFloatAsState(
-            if (isPressed) .5f else 1f,
+            when {
+                isPressed -> .5f
+                isHovered -> .85f
+                else -> 1f
+            },
             animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
         )
 
@@ -53,9 +63,18 @@ fun Modifier.alphaIndicationSelectable(
 ): Modifier {
     val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    // Touch screens never emit a hover interaction, so this is a no-op there. With a mouse - the
+    // magnetic keyboard case and desktop mode on a tablet - it is the only feedback these
+    // modifiers give: without it a pointer user gets no indication that a row is interactive,
+    // because `indication = null` suppresses the ripple too.
+    val isHovered by interactionSource.collectIsHoveredAsState()
     val animatedAlpha by
         animateFloatAsState(
-            if (isPressed) .5f else 1f,
+            when {
+                isPressed -> .5f
+                isHovered -> .85f
+                else -> 1f
+            },
             animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
         )
 
