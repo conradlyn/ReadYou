@@ -1,0 +1,132 @@
+name: "Fork Auto Release (on push)"
+
+# Additive file, like manual-build.yaml / release-build.yaml / fork-unit-tests.yaml: a new file,
+# so it can never conflict with the upstream workflows when rebasing.
+#
+# Why this exists instead of just adding `push` to release-build.yaml: every push to main should
+# end with a downloadable APK on the releases page, with no manual dispatch. That means one run has
+# to do the whole chain - build, cut the tag, publish the release - because a tag pushed with the
+# workflow's own GITHUB_TOKEN does **not** start another workflow run. Relying on the tag push to
+# trigger release-build.yaml would silently produce no release at all.
+#
+# Cost note: this repository is public, and Actions minutes are free for public repositories, so
+# building here as well as in build_commit.yaml costs nothing but wall-clock time.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Needed to create the tag ref and the release. Least privilege beyond that.
+permissions:
+  contents: write
+
+# Releases are serialised: two pushes in quick succession must not race for the same tag number.
+# Not cancel-in-progress - a half-uploaded release is worse than a slow one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Belt and braces against a self-triggered loop. `branches:` already filters tag pushes, but the
+    # tag this job pushes is pushed with GITHUB_TOKEN, and making the intent explicit here means a
+    # future edit to the trigger block cannot turn this into an infinite release loop.
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the tag serial and the changelog are both read out of the tags.
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble
+        run: ./gradlew assembleGithubRelease --max-workers=2
+
+      # Uses the gh CLI that ships with the runner rather than a third-party release action, to
+      # keep the supply chain the same as the rest of this repo (same as release-build.yaml).
+      - name: Cut a tag and publish the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          apks=(app/build/outputs/apk/github/release/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "::error::no APK was produced, nothing to publish"
+            exit 1
+          fi
+          printf 'asset: %s\n' "${apks[@]}"
+
+          # Annotated tags need an identity; the runner has none configured.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Read the version out of the build script rather than hardcoding it, so the tag can
+          # never drift from the APK file name (ReadYou-<versionName>-<sha>.apk).
+          version=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+            app/build.gradle.kts | head -1)
+          if [ -z "$version" ]; then
+            echo "::error::could not read versionName from app/build.gradle.kts"
+            exit 1
+          fi
+          prefix="v${version}-tablet."
+          echo "version: ${version} (tag prefix ${prefix})"
+
+          # Next serial = highest existing + 1. Retried against freshly fetched tags, because a
+          # sibling run that was queued behind this one may have taken the number already.
+          tag=""
+          prev=""
+          for attempt in 1 2 3 4 5; do
+            # `--force` so a tag an earlier run rewrote locally cannot block the fetch. No
+            # `--prune-tags`: the runner's origin has no tag refspec, and git refuses that combo.
+            git fetch --tags --force origin 2>/dev/null || true
+            existing=$(git tag -l "${prefix}*" | sort -V)
+            last=$(printf '%s\n' "$existing" | sed "s|^${prefix}||" | sort -n | tail -1)
+            prev=$(printf '%s\n' "$existing" | tail -1)
+            tag="${prefix}$(( ${last:-0} + 1 ))"
+            echo "attempt ${attempt}: tag=${tag} prev=${prev:-none}"
+            if git tag -a "$tag" -m "ReadYou ${version} - tablet preview build ${tag##*.}" \
+               && git push origin "$tag"; then
+              break
+            fi
+            git tag -d "$tag" >/dev/null 2>&1 || true
+            tag=""
+            if [ "$attempt" = 5 ]; then
+              echo "::error::could not push a fresh tag after 5 attempts"
+              exit 1
+            fi
+          done
+
+          # Markdown is whitespace sensitive: build the notes from explicit newlines, so that the
+          # indentation of this script never turns into a code block. (Same trap as release-build.yaml.)
+          notes="Built from \`${GITHUB_SHA}\` by the **${GITHUB_WORKFLOW}** workflow."
+          if [ -n "${prev:-}" ]; then
+            notes="${notes}"$'\n\n'"**Changes since \`${prev}\`:**"
+            notes="${notes}"$'\n\n'"$(git log --format='- %s' "${prev}..${GITHUB_SHA}")"
+          fi
+          notes="${notes}"$'\n\n'"Signed with the debug keystore committed at \`signature/reader.keystore\`,"
+          notes="${notes}"$'\n'"so it will not install over an F-Droid or Google Play build. Uninstall those first."
+
+          gh release create "$tag" "${apks[@]}" \
+            --verify-tag \
+            --title "$tag" \
+            --prerelease \
+            --notes "$notes"
+
+          {
+            echo "### Released \`${tag}\`"
+            echo ""
+            echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
+          } >> "$GITHUB_STEP_SUMMARY"

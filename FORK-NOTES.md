@@ -1,12 +1,12 @@
 # FORK-NOTES.md — 跟随上游的检查单
 
 这个 fork 相对 `upstream/main` 有两类改动：**平板适配**（本文档）和 **CI**（`manual-build.yaml`、
-`release-build.yaml`、`fork-unit-tests.yaml`，纯新增文件，永不冲突）。
+`release-build.yaml`、`fork-unit-tests.yaml`、`fork-auto-release.yaml`，纯新增文件，永不冲突）。
 
 跟随上游时不要重读 diff。按下面的顺序做，每一步都有明确的"看什么、为什么"。
 
 - **基线**：上游合并点 `d2b979cc`
-- **本文档更新于**：2026-09-23（`v0.16.2-tablet.3` 发布后修掉顶部栏图标消失，见 §2.5）
+- **本文档更新于**：2026-09-23（`v0.16.2-tablet.3` 之后修掉顶部栏图标消失 → §2.5；发布改为 push 全自动 → §7）
 
 ---
 
@@ -24,7 +24,7 @@
 
 **新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass}.kt`、
 `ui/component/ListFonts.kt`、`infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
-`ListFontsPreference.kt`、三个 workflow、3 个单测。
+`ListFontsPreference.kt`、四个 workflow、3 个单测。
 
 ---
 
@@ -71,6 +71,7 @@
 |---|---|---|---|
 | push | `fork-unit-tests.yaml`（自有） | `testGithubReleaseUnitTest` | ✅ **这是本 fork 的 guard** |
 | push | `build_commit.yaml`（上游） | `assembleGithubRelease` | ❌ 只编译主源集 |
+| push | `fork-auto-release.yaml`（自有） | assemble + 打 tag + 挂 release | ❌ |
 | 开 PR | `testing.yml`（上游） | `testGithubReleaseUnitTest` | ✅ |
 | 手动 | `manual-build.yaml`（自有） | assemble 四种 flavor | ❌ |
 
@@ -181,3 +182,58 @@ navigationIcon = {
 
 **上游合并 = fork 冲突面归零。** 提 PR 前先想清楚 `ListFontsPreference` 用 `-1` 当哨兵这点，
 上游可能更倾向 `Int?` 或单独的布尔开关。
+
+---
+
+## 7. 发布流程：push 即出 release（全自动）
+
+**约定：每一次 push 到 `main`，都要产出 APK、打 tag、挂 release，用户直接在 release 页面下载。**
+由自有的 `fork-auto-release.yaml` 完成，不需要任何手工操作。
+
+### 7.1 它做了什么
+
+一个 run 内顺序完成：`assembleGithubRelease` → 算序号 → 建 annotated tag → `gh release create` 上传 APK。
+
+| 项 | 取值 | 怎么来的 |
+|---|---|---|
+| tag | `v<versionName>-tablet.<N>` | `versionName` 从 `app/build.gradle.kts` 现读（**不硬编码**，永不与 APK 名漂移）；`N` = 已有同前缀 tag 的最大值 + 1 |
+| release | `--prerelease`，title = tag | 与 `tablet.1/.2/.3` 既有风格一致 |
+| notes | 「Built from `<sha>`」+ 上一个 tag 以来的 commit 列表 + 签名说明 | `git log <prev-tag>..<sha>` |
+| asset | `app/build/outputs/apk/github/release/*.apk` | 名形如 `ReadYou-<versionName>-<7位sha>.apk` |
+
+### 7.2 为什么不能只给 `release-build.yaml` 加 `push` 触发器（关键）
+
+那是最省事的写法，但**行不通**：`release-build.yaml` 靠 `on: push: tags: "v*"` 触发，而本工作流要用
+**自己的 `GITHUB_TOKEN` 去推那个 tag** —— GitHub 明确规定，
+**用 `GITHUB_TOKEN` 产生的事件不会再触发新的 workflow run**（防递归）。于是 tag 推上去了、
+**什么都不会发生**，release 页面空空如也，而且每一步看起来都"成功"。
+
+所以整套链路（build + tag + release）必须由同一个 run 自己走完。
+
+顺带的好处：既然 GITHUB_TOKEN 推 tag 不触发 workflow，也就**不会**形成"push → 打 tag → 又触发 push → 又打 tag"的死循环。
+
+### 7.3 防重与防竞态
+
+- **防自触发**：`on: push: branches: [main]` 之外，job 上还有 `if: github.ref_type == 'branch'`。
+  这是第二道锁 —— 万一有人把 `branches:` 改掉，也不会退化成无限发版循环。
+- **防竞态**：`concurrency` 固定 group + `cancel-in-progress: false`，两次连续 push 的 run **排队**而不是并行。
+  同时序号计算带重试（每轮先 `git fetch --tags --force` 再取 max+1），
+  万一并行算出同一个号，`git push` 被拒后重算，最多 5 次。
+- **不留半成品**：先 build，成功后才建 tag、才建 release。构建失败 → 不产生 tag、不产生空 release。
+
+### 7.4 什么时候还会用到 `release-build.yaml`（手动）
+
+保留它，用于自动化覆盖不了的场景：**重发/更新某个已存在的 tag**（`gh release upload --clobber` 语义）、
+换 flavor（`assembleFdroidRelease` 等）、或某次 CI 失败后手工补一个包。它按 tag 触发，与本工作流互不干涉。
+
+### 7.5 成本与已知取舍
+
+- 仓库是 **public** → Actions 分钟数不计费，`build_commit.yaml` 与 `fork-auto-release.yaml` 各构建一次
+  只是多花几分钟墙钟时间，不产生费用。
+- **纯文档提交也会发一个 release**（本工作流的触发条件就是"push 到 main"）。
+  若某天觉得噪音大，给 `on.push` 加 `paths-ignore: ['**/*.md', '.workbuddy/**']` 即可 —— 但那样文档类提交
+  就没有可下载的包了，属取舍。
+- tag 序号来自仓库**已有 tag**，不来自 `versionCode`（`47` 目前不变）。所以升级 versionName 时
+  序号会从头开始（`v0.16.3-tablet.1`），这是刻意的：序号只表示"本 version 内的第几个预览包"。
+- **半成品排查**：若某次 run 建了 tag 但没挂上 release，重跑该 run 不会复用旧 tag（序号已 +1），
+  会多出一个空 tag —— 需要手工清理，或直接用 `release-build.yaml` 对着那个 tag 补发。
