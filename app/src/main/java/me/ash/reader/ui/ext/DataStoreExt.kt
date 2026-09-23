@@ -195,6 +195,8 @@ sealed interface PreferencesKey {
         const val swipeStartAction = "swipeStartAction"
         const val swipeEndAction = "swipeEndAction"
         const val markAsReadOnScroll = "markAsReadOnScroll"
+        const val markAllAsReadWithoutConfirm = "markAllAsReadWithoutConfirm"
+        const val markAsReadButtonPosition = "markAsReadButtonPosition"
         const val hideEmptyGroups = "hideEmptyGroups"
         const val pullToLoadNextFeed = "pullToLoadNextFeed"
         const val pullToSwitchArticle = "pullToSwitchArticle"
@@ -275,6 +277,8 @@ sealed interface PreferencesKey {
                 IntKey(swipeStartAction),
                 IntKey(swipeEndAction),
                 BooleanKey(markAsReadOnScroll),
+                BooleanKey(markAllAsReadWithoutConfirm),
+                IntKey(markAsReadButtonPosition),
                 BooleanKey(hideEmptyGroups),
                 BooleanKey(pullToLoadNextFeed),
                 BooleanKey(pullToSwitchArticle),
@@ -365,6 +369,8 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
         const val swipeStartAction = "swipeStartAction"
         const val swipeEndAction = "swipeEndAction"
         const val markAsReadOnScroll = "markAsReadOnScroll"
+        const val markAllAsReadWithoutConfirm = "markAllAsReadWithoutConfirm"
+        const val markAsReadButtonPosition = "markAsReadButtonPosition"
         const val hideEmptyGroups = "hideEmptyGroups"
         const val pullToLoadNextFeed = "pullToLoadNextFeed"
         const val pullToSwitchArticle = "pullToSwitchArticle"
@@ -516,6 +522,13 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
                 swipeEndAction to DataStoreKey(intPreferencesKey(swipeEndAction), Int::class.java),
                 markAsReadOnScroll to
                     DataStoreKey(booleanPreferencesKey(markAsReadOnScroll), Boolean::class.java),
+                markAllAsReadWithoutConfirm to
+                    DataStoreKey(
+                        booleanPreferencesKey(markAllAsReadWithoutConfirm),
+                        Boolean::class.java
+                    ),
+                markAsReadButtonPosition to
+                    DataStoreKey(intPreferencesKey(markAsReadButtonPosition), Int::class.java),
                 hideEmptyGroups to
                     DataStoreKey(booleanPreferencesKey(hideEmptyGroups), Boolean::class.java),
                 pullToLoadNextFeed to

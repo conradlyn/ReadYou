@@ -158,6 +158,7 @@
     <string name="group_list">组列表</string>
     <string name="always_expand">始终展开</string>
     <string name="top">顶部</string>
+    <string name="bottom">底部</string>
     <string name="mark_as_read_button_position">“标记为已读”按钮的位置</string>
     <string name="top_bar">标题栏</string>
     <string name="fill_selected_icon">填充当前筛选器图标</string>
@@ -308,6 +309,7 @@
     <string name="native_component">原生组件</string>
     <string name="about">关于</string>
     <string name="mark_as_read_on_scroll">滚动时标记为已读</string>
+    <string name="mark_all_as_read_without_confirm">点击按钮直接全部标记为已读，无需确认</string>
     <string name="become_a_sponsor">成为赞助者</string>
     <string name="sponsor_desc">我们在闲暇时间构建并维护这个自由开源应用。如果你觉得应用还不错，请考虑用小额捐赠支持哦我们！☕️</string>
     <string name="toolbars">工具栏</string>
