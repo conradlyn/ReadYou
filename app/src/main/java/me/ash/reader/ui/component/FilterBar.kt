@@ -4,6 +4,7 @@ import android.os.Build
 import android.view.SoundEffectConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -82,10 +83,24 @@ fun FilterBar(
         ) {
 
             Spacer(modifier = Modifier.width(filterBarPadding))
-            leading?.invoke()
+            leading?.let { item ->
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    item()
+                }
+            }
             Filter.values.forEach { item ->
                 NavigationBarItem(
-                    modifier = Modifier.height(containerHeight),
+                    // The explicit weight is what makes the leading slot and the filter items divide
+                    // the row the same way. A NavigationBarItem only lays out as a peer of its
+                    // siblings inside a NavigationBar, which is a Row that hands it a weight; in this
+                    // plain Row it keeps its own content width. Without the weight the filters would
+                    // stretch over everything but the leading action's 40dp, which is exactly the
+                    // lopsided bar this parameter has to avoid. Applying it here keeps the split
+                    // independent of what the item does internally.
+                    modifier = Modifier.weight(1f).height(containerHeight),
                     alwaysShowLabel = when (filterBarStyle) {
                         FlowFilterBarStylePreference.Icon.value -> false
                         FlowFilterBarStylePreference.IconLabel.value -> true

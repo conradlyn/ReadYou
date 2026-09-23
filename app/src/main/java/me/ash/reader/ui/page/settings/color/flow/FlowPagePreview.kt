@@ -129,7 +129,7 @@ fun FlowPagePreview(
                         FeedbackIconButton(
                             imageVector = Icons.Rounded.DoneAll,
                             contentDescription = stringResource(R.string.mark_all_as_read),
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         ) {}
                     }
                 } else {

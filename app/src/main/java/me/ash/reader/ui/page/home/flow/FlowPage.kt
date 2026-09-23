@@ -203,16 +203,14 @@ fun FlowPage(
         }
     }
 
-    // Null when the button lives in the top bar, so the filter bar adds no leading item at all.
+    // Null when the button lives in the top bar, and null on the starred filter, so the filter bar
+    // adds no slot at all and its three items re-spread over the whole width. Dropping the item
+    // rather than hiding it is what keeps the row evenly divided in every state.
     val markAsReadButtonLeading: (@Composable () -> Unit)? =
-        if (markAsReadButtonPosition == MarkAsReadButtonPositionPreference.Bottom) {
-            {
-                MarkAsReadIconButton(
-                    visible = !filterUiState.filter.isStarred(),
-                    active = markAsRead,
-                    onClick = onMarkAsReadClick,
-                )
-            }
+        if (markAsReadButtonPosition == MarkAsReadButtonPositionPreference.Bottom &&
+            !filterUiState.filter.isStarred()
+        ) {
+            { MarkAsReadIconButton(active = markAsRead, onClick = onMarkAsReadClick) }
         } else {
             null
         }
@@ -432,11 +430,14 @@ fun FlowPage(
                             if (markAsReadButtonPosition ==
                                 MarkAsReadButtonPositionPreference.Top
                             ) {
-                                MarkAsReadIconButton(
-                                    visible = !filterUiState.filter.isStarred(),
-                                    active = markAsRead,
-                                    onClick = onMarkAsReadClick,
-                                )
+                                RYExtensibleVisibility(
+                                    visible = !filterUiState.filter.isStarred()
+                                ) {
+                                    MarkAsReadIconButton(
+                                        active = markAsRead,
+                                        onClick = onMarkAsReadClick,
+                                    )
+                                }
                             }
                             FeedbackIconButton(
                                 imageVector = Icons.Rounded.Search,
@@ -791,29 +792,28 @@ fun FlowPage(
 /**
  * The "mark as read" (DoneAll) action, drawn identically wherever the user placed it.
  *
- * Note the [RYExtensibleVisibility] wrapper. A layout modifier applied straight to a
- * [FeedbackIconButton] lands on the inner `Icon` of its 40dp `IconButton` rather than on the button
- * itself, so a padding as large as the tablet gutter squeezes the glyph to zero width and the
- * button silently disappears. FeedsPage hit exactly that. Keeping the animation on the outside
- * means neither placement can reintroduce it.
+ * Deliberately carries no layout modifier and no visibility wrapper of its own. A modifier handed to
+ * [FeedbackIconButton] lands on the inner `Icon` of its 40dp `IconButton` rather than on the button,
+ * so a padding as wide as the tablet gutter squeezes the glyph to a zero width and the button
+ * silently disappears; FeedsPage hit exactly that. Hiding it is the caller's job instead — the top
+ * bar fades the item, the bottom bar drops it so its slot collapses. Neither can squeeze it.
+ *
+ * The idle tint is the one an unselected filter item uses, so the bar reads as a single row.
  */
 @Composable
 private fun MarkAsReadIconButton(
-    visible: Boolean,
     active: Boolean,
     onClick: () -> Unit,
 ) {
-    RYExtensibleVisibility(visible = visible) {
-        FeedbackIconButton(
-            imageVector = Icons.Rounded.DoneAll,
-            contentDescription = stringResource(R.string.mark_all_as_read),
-            tint =
-                if (active) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            onClick = onClick,
-        )
-    }
+    FeedbackIconButton(
+        imageVector = Icons.Rounded.DoneAll,
+        contentDescription = stringResource(R.string.mark_all_as_read),
+        tint =
+            if (active) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        onClick = onClick,
+    )
 }
