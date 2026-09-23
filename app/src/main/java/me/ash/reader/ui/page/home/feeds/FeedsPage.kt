@@ -7,6 +7,7 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -187,6 +188,13 @@ fun FeedsPage(
             // Lines the two icons up with the centred content column below them. Only the icons
             // move: the bar itself stays full width, so tapping anywhere on it still scrolls the
             // list back to the top.
+            //
+            // The inset sits on a `Box` around each icon, never on the icon's own `modifier`.
+            // `FeedbackIconButton` hands that modifier to the `Icon` inside a fixed 40.dp
+            // `IconButton`, so a padding wider than that box clamps the icon's constraints to zero
+            // and the icon measures to zero width - invisible, though still laid out and still
+            // clickable. Nothing would show on a phone, where the gutter is zero; past roughly
+            // 720dp it deleted the settings button.
             val adaptiveGutter = rememberAdaptiveContentGutter()
             TopAppBar(
                 modifier =
@@ -203,25 +211,28 @@ fun FeedsPage(
                     ),
                 title = {},
                 navigationIcon = {
-                    FeedbackIconButton(
-                        modifier = Modifier.padding(start = adaptiveGutter).size(20.dp),
-                        imageVector = Icons.Outlined.Settings,
-                        contentDescription = stringResource(R.string.settings),
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        showBadge = newVersion.whetherNeedUpdate(currentVersion, skipVersion),
-                    ) {
-                        navigateToSettings()
+                    Box(modifier = Modifier.padding(start = adaptiveGutter)) {
+                        FeedbackIconButton(
+                            modifier = Modifier.size(20.dp),
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = stringResource(R.string.settings),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            showBadge = newVersion.whetherNeedUpdate(currentVersion, skipVersion),
+                        ) {
+                            navigateToSettings()
+                        }
                     }
                 },
                 actions = {
                     if (subscribeViewModel.rssService.get().addSubscription) {
-                        FeedbackIconButton(
-                            modifier = Modifier.padding(end = adaptiveGutter),
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = stringResource(R.string.subscribe),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        ) {
-                            subscribeViewModel.showDrawer()
+                        Box(modifier = Modifier.padding(end = adaptiveGutter)) {
+                            FeedbackIconButton(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = stringResource(R.string.subscribe),
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            ) {
+                                subscribeViewModel.showDrawer()
+                            }
                         }
                     }
                 },
