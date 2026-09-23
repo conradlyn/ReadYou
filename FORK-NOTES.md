@@ -84,6 +84,13 @@
 
 **另一个理由**：本机没有 JDK / Android SDK，`./gradlew test` 手动也跑不了。CI 是唯一的执行环境。
 
+**实测基线（2026-09-23，`1815cee8`）**：`fork-unit-tests.yaml` 首次运行即绿，报告里
+**22 个单测、0 failures、0 skipped**，三个自有测试类全部执行：
+`ListFontBaselineTest`(3) / `AdaptiveContentWidthTest`(5) / `AppSizeClassTest`(4)。
+**重点是 `ListFontBaselineTest` 没有 skip** —— 说明在纯 JVM 单测里能加载 Material 3 的 `Typography`，
+`titleMedium = 16sp` 这条假设在当时的 Compose 版本上被实测确认，guard 是活的。
+以后 rebase 完看这个工作流：**它绿且没有 skip 步骤失败，才说明字号基线没被动过。**
+
 ---
 
 ## 3. 真机核验清单
