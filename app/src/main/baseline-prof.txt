@@ -1,0 +1,36 @@
+# ReadYou fork —— 手写的 baseline profile（不是真机采集）
+#
+# 背景：AndroidX 依赖（Compose runtime 等）AAR 里自带的 baseline-prof.txt 已经由 AGP
+# 自动合并，但**应用自身**启动与首屏路径的 profile 一直是空的。真机采集需要
+# macrobenchmark 模块 + 一台设备/模拟器（CI 上还得是有 KVM 的 Linux runner），成本高。
+#
+# 这里退一步：手写一份只覆盖「启动入口 + 首屏必经类」的最小 profile。
+# 收益小于真机 profile，但它零设备依赖，并且能验证整条链路是通的
+# —— 构建后 assets/dexopt/baseline.prof 应该比原来的 7,224 字节大。
+#
+# 注意：下面用的是**类级规则**，意思是该类所有方法都会参与 AOT 编译。
+# 不要往里堆无关的类，那只会增大 odex 体积、延长安装时的 dex2oat 时间。
+
+# --- 启动入口 ---
+Lme/ash/reader/infrastructure/android/AndroidApp;
+Lme/ash/reader/infrastructure/android/MainActivity;
+Lme/ash/reader/infrastructure/android/CrashHandler;
+
+# --- 首屏：主题与页面骨架 ---
+Lme/ash/reader/ui/theme/ThemeKt;
+Lme/ash/reader/ui/page/nav3/AppEntryKt;
+Lme/ash/reader/ui/page/common/HomeEntryKt;
+Lme/ash/reader/ui/component/base/RYScaffoldKt;
+
+# --- 首屏：信息流列表（冷启动后第一屏就要渲染的部分） ---
+Lme/ash/reader/ui/page/home/flow/FlowPageKt;
+Lme/ash/reader/ui/page/home/flow/FlowViewModel;
+Lme/ash/reader/ui/page/home/flow/ArticleListKt;
+Lme/ash/reader/ui/page/home/flow/ArticleItemKt;
+Lme/ash/reader/ui/page/home/flow/StickyHeaderKt;
+Lme/ash/reader/ui/component/FilterBarKt;
+Lme/ash/reader/ui/component/FeedIconKt;
+
+# --- 首屏：数据读取与已读状态覆盖层 ---
+Lme/ash/reader/domain/data/DiffMapHolder;
+Lme/ash/reader/domain/service/RssService;

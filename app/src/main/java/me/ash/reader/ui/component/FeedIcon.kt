@@ -18,9 +18,20 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.size.Size
 import me.ash.reader.R
 import me.ash.reader.ui.component.base.Base64Image
 import me.ash.reader.ui.component.base.RYAsyncImage
+
+/**
+ * 图标在界面上最大也就 32dp 左右，即使 3x 屏也只需约 96px。
+ *
+ * 不给 [RYAsyncImage] 传 size 时会落到它的默认值 `Size.ORIGINAL`，即**按图片原始分辨率解码**。
+ * 订阅源的 logo 常见 512×512（PWA icon）乃至 1200×630（og-image），后者解码后约 3 MB 位图
+ * —— 全部为了渲染一个 20dp 的圆点。而列表每一项都有图标，订阅管理页一次列出几百个，
+ * 平板上双栏同时渲染的条数更多。
+ */
+private val FEED_ICON_DECODE_SIZE = Size(192, 192)
 
 @Composable
 fun FeedIcon(
@@ -54,6 +65,7 @@ fun FeedIcon(
             contentDescription = feedName ?: "",
             data = iconUrl,
             placeholder = null,
+            size = FEED_ICON_DECODE_SIZE,
         )
     }
 }
