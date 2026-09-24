@@ -507,18 +507,31 @@ git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
 2. **字体基线守卫**——`ListFontBaselineTest` 3 用例 **0 skip**（`fork-unit-tests.yaml` 里那步
    「skip 也算失败」的守卫生效），说明 Compose BOM 的 `titleMedium` 仍是 16sp。
 
-**还没拿到的数字**：`27edf7bc` APK 内 `assets/dexopt/baseline.prof` 的字节数。
-`Build Commit` 日志显示 AGP 跑了 `:mergeGithubReleaseArtProfile` →
-`:expandGithubReleaseArtProfileWildcards` → `:compileGithubReleaseArtProfile` 且**零告警**，
-说明源集里的 `baseline-prof.txt` 被处理了；但**光有 library 自带的 profile 这些任务也会出现，
-所以这不算决定性证据**。当晚 `github.com` / `release-assets` 直连与代理两条都断，拿不到包。
-补测（网络恢复后）：
+**`baseline-prof.txt` 到底进包了没有：进了，而且内容真的变了。**
 
-```
-python ~/.workbuddy/skills/android-edit-verify-offline/scripts/peek_apk_entry.py \
-  "https://github.com/conradlyn/ReadYou/releases/download/v0.16.2-tablet.8/ReadYou-0.16.2-27edf7bc.apk" \
-  "assets/dexopt/baseline.prof" "classes.dex"
-```
+用 HTTP Range 只取 APK 尾部读出中央目录（不下整包，见 `android-edit-verify-offline` §1.7）：
 
-对照基线：`f40e6650` 的包里 `baseline.prof` = **7,224 B**、`baseline.profm` = **1,105 B**。
-（`baseline.prof` 是 zlib 压缩的，`unzip -l` 报的是压缩后大小。）
+| 条目 | `f40e6650`（tablet.7，无源集 profile） | `27edf7bc`（tablet.8，有源集 profile） | Δ |
+|---|---|---|---|
+| `assets/dexopt/baseline.prof`（zip 内 STORE） | 7,224 B | **7,266 B** | **+42** |
+| 同一条目**内层** zlib 解压后 | 77,605 B | **76,826 B** | **−779** |
+| `assets/dexopt/baseline.profm` | 1,105 B | 1,101 B | −4 |
+
+**怎么读这三行：**
+
+1. **链路是通的。** 源集里的 `baseline-prof.txt` 真的被 AGP 合并、编译、打进包了。
+   原来这一步只是"看起来应该生效"，现在有数字。文件自己写的验收标准（>7,224 B）达成。
+2. **收益很小（+42 B），别高估。** 这份 profile 用的是**类级规则**，在 ART 的二进制
+   profile 里类级 hot 标记非常紧凑（每类约 1~3 字节），16 个类就是几十字节。
+   真正能改变启动耗时的还是**真机采集的、带方法级 hot/startup 标记的 profile**
+   （要 macrobenchmark + 一台设备，CI 上还得有 KVM 的 Linux runner）。
+   **+42 B 是「把管道接通」的证据，不是「启动变快了」的证据** —— 别对外说成后者。
+3. **`−779 B`（解压后反而变小）是意外收获。** 包内变大、解压后变小，说明**合并进来的
+   profile 内容确实变了**，不是"文件被原样带上"。一个合理（**但未证实**）的解释是：
+   删掉 `implementation(libs.compose.ui.tooling)` 后，ui-tooling 那份库自带 profile
+   不再参与合并，抵消并超过了我们新增的部分。**若要坐实这一条，需要去 ui-tooling AAR
+   里确认它到底有没有带 `baseline-prof.txt`** —— 不要仅凭这个数字就断言。
+
+> 反面教材：`Build Commit` 日志里的 `:mergeGithubReleaseArtProfile` /
+> `:expandGithubReleaseArtProfileWildcards` / `:compileGithubReleaseArtProfile` **不能**当作
+> 「源集 profile 被读取了」的判据——只有 library 自带的 profile 时这些任务照样会跑、照样零告警。
