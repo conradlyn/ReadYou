@@ -6,7 +6,7 @@
 跟随上游时不要重读 diff。按下面的顺序做，每一步都有明确的"看什么、为什么"。
 
 - **基线**：上游合并点 `d2b979cc`
-- **本文档更新于**：2026-09-24（新增 **§9 上游友好度**、本次优化清单；§1 补挂载点；**§2.8 字体设置的两层结构**与 §9.6 的落盘教训）
+- **本文档更新于**：2026-09-24（新增 **§9 上游友好度**、本次优化清单；§1 补挂载点；**§2.8 字体设置的两层结构**与 §9.6 的落盘教训；**§9.3 平板缩放与字体收尾**、§2.2/§2.3 的缩放倍率与恒等约束、§9.6 行尾结论按平台更正）
 
 ---
 
@@ -31,15 +31,19 @@
 | 已读状态的重组范围 | `ui/page/home/flow/ArticleList.kt` 的 `rememberIsUnread()` | `diffMap` 是 `SnapshotStateMap`，直接读记录的是 map 级依赖；包一层 `derivedStateOf` |
 | Widget 任务入队 | `domain/service/WidgetUpdateWorker.kt` | 一次性任务改 `enqueueUniqueWork(KEEP)`；预览守卫从实例字段改成进程级标记 |
 | 抓取层（UA / 字符集） | `infrastructure/di/OkHttpClientModule.kt`、`infrastructure/rss/RssHelper.kt` | 来自上游 open PR，见 §9.2 |
+| 平板缩放（图标 / 控件高度） | `ui/adaptive/AdaptiveSizing.kt` 的 `adaptiveSize()` + 15 个调用点 | **Compact 恒等**；只放大字形与承载它的栏高，见 §2.2 / §2.3 |
+| FilterBar / 搜索栏跟随页面字号 | `ui/component/FilterBar.kt` 的 `labelStyle` 参数、`flow/SearchBar.kt` 的 `textStyle` 参数 | 默认值与上游逐字节等价，调用点可原样不传 |
+| 两页**各自**的自定义 TTF | `ui/ext/ListExternalFonts.kt` 的 `Slot.Feeds` / `Slot.Flow` | 不新增偏好键，复用 `ListFontsPreference.External` |
 
-**新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass}.kt`、
-`ui/component/ListFonts.kt`、`infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
+**新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass,AdaptiveSizing}.kt`、
+`ui/component/ListFonts.kt`、`ui/ext/ListExternalFonts.kt`、
+`infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
 `ListFontsPreference.kt`、`MarkAsReadButtonPositionPreference.kt`、
 `MarkAllAsReadWithoutConfirmPreference.kt`、`TitleFontsPreference.kt`、
 `{Flow,Reading}TitleFontsPreference.kt`、`ReadingAutoFullContentPreference.kt`、
 `app/src/main/baseline-prof.txt`、四个 workflow、
-4 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
-`OkHttpClientModuleTest`）。
+5 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
+`AdaptiveScaleTest`、`OkHttpClientModuleTest`）。
 
 ---
 
@@ -68,10 +72,17 @@
 - [ ] `ui/component/reader/Styles.kt` 的 `MediumContentWidth`(600) / `ExpandedContentWidth`(768) 是否仍是 600/768。
       自有的 `AdaptiveContentMaxWidth = 640.dp` 是为了**夹在两者之间**才选的；上游若改成同一档，
       可以考虑统一，但**不要**顺手改成 600（列表行比正文段落耐受更宽）。
+- [ ] **缩放倍率三档 `1f / 1.15f / 1.25f`**（`ui/adaptive/AdaptiveLayout.kt` 的 `AdaptiveScaleCompact/Medium/Expanded`）。
+      `Compact` 必须**恰好是 `1f`** —— 这是「手机端与上游逐像素一致」的唯一保证，也是这套改动能被上游接受的前提。
+      改成 `1.05f` 之类会**编译通过、发布、并静默改变所有手机端**，没有别的测试会报警。
+      报警器是 `AdaptiveScaleTest`；`Medium` 档也**不能省**，8.8" 平板竖屏约 800dp 落的就是它。
+- [ ] `ui/adaptive/AdaptiveSizing.kt` 的 `scaledDp(base, scale)` 是否仍是唯一的缩放算术入口。
+      `adaptiveSize()` 只是它的 `@Composable` 包装 —— 纯函数才能被单测钉住，别把算术挪回包装里。
 
 ### 2.3 限宽的行为边界
 
-- [ ] `AdaptiveLayoutSpec.Compact` 仍是「不做任何适配」：gutter 恒为 0。
+- [ ] `AdaptiveLayoutSpec.Compact` 仍是「不做任何适配」：gutter 恒为 0、`scale` 恒为 `1f`
+      （`scaledDp` 在 `scale == 1f` 时直接返回 `base` 本身，连乘法都不做）。
       **手机端必须与上游逐像素一致**，这是本改动能被上游接受、也是它不成为行为分叉的前提。
 - [ ] `adaptiveContentGutter()` 对 `Dp.Unspecified` / `Dp.Infinity` 返回 `0.dp`。
 - [ ] `AppSizeClass.fromWidthDp()` 仍从不抛异常（负数、0 都落 `Compact`）。
@@ -548,6 +559,37 @@ git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
 - 4 条新字符串，`values/` 与 `values-zh-rCN/` 各一份，**都追加在 `</resources>` 之前**
   （上游友好度最高的位置）。
 
+**平板缩放与字体收尾（2026-09-23 → 09-24，本轮）**
+
+用户原话：「字体设置再收尾（FilterBar / 搜索栏跟随字号、两页各自的自定义 TTF 导入）…然后把图标也调整一下，现在的太小了，可能是针对手机的，我需要针对平板的（我的平板 8.8 英寸）。」
+
+| 能力 | 落点 | 上游友好度 |
+|---|---|---|
+| 图标与控件高度按尺寸类放大 | 新文件 `ui/adaptive/AdaptiveSizing.kt`（`adaptiveSize()` / `scaledDp()` / `adaptiveScale()`）+ 15 个调用点各 1 行 | 高：Compact 恒等，手机端逐 dp 不变 |
+| FilterBar 标签跟随页面字号 | `ui/component/FilterBar.kt` 新增 `labelStyle: TextStyle? = null`，默认 `LocalTextStyle.current` | 高：默认值与「完全不传 style」逐字节等价 |
+| 搜索栏跟随页面字号 | `ui/page/home/flow/SearchBar.kt` 新增 `textStyle: TextStyle = MaterialTheme.typography.bodyLarge` | 高：同上 |
+| 两页**各自独立**的自定义 TTF | 新文件 `ui/ext/ListExternalFonts.kt`（`Slot.Feeds` → `feeds_font.ttf`、`Slot.Flow` → `flow_font.ttf`） | 高：纯新增文件 |
+| 缩放倍率守卫 | 新文件 `app/src/test/.../AdaptiveScaleTest.kt` | 纯新增 |
+
+**三个关键设计决定（改动前先读这段）**
+
+1. **不放大文本**。用户已有显式可见的字号旋钮；再叠一层隐式全局倍率会让设置页显示的数字变成谎言。
+   这个错误这一层犯过并已回退，完整理由写在 `AdaptiveLayout.kt` 的 KDoc 里。
+2. **不放大触控目标与列表行高**。用户在本轮的选择里**明确只勾了「顶栏与 FilterBar 高度」**，
+   没勾「触控目标」和「列表行高与内边距」。图标字形必然包含在勾选项内。
+3. **两页各自导入不新增偏好键**。靠「文件路径 + 槽位参数」区分，`ListFontsPreference` 复用现有
+   `External(5)` 值 —— 避开了 §2.6 的「漏一处静默失效」陷阱，偏好注册面零增长。
+
+**与阅读页字体导入的一处刻意差异**：阅读页（`ExternalFonts`）导入后 `context.restart()`；
+列表页（`ListExternalFonts`）**不重启**，靠 `mutableStateMapOf` 做 generation 计数器，在 `remember` 的 key 里读它。
+原因是「重复导入同一槽位不改变任何偏好值」—— `External` 存的值前后一样，静态缓存的 `FontFamily` 不会失效，只有 generation 能触发失效。
+
+**MIME 类型**：两页都用 `MimeType.FONT`（`font/ttf`），与 `ReadingStylePage.kt:333`、
+`ColorAndStylePage.kt:249` 一致。若真机上某些设备筛不出 `.ttf` 文件，三处一起放宽。
+
+**`FeedbackIconButton` 的尺寸必须走参数而不是 `modifier`**（§2.5 的同一条陷阱）：本轮把 `iconSize: Dp = 24.dp` 提成参数，
+因为经 `modifier` 传入的尺寸会被原样应用、静默绕过缩放。
+
 ### 9.6 本轮的一个教训：改动"报成功"不等于已落盘
 
 这批改动里，**有 3 处 Edit 回报成功但文件没变**（IDE 同时开着这些文件，先出现
@@ -559,8 +601,22 @@ git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
 `android-edit-verify-offline` §1.4b + `scripts/patch_text.py`（CRLF 感知、幂等、原子写入、
 `apply` 与 `check` 两个模式）。**同步上游后改本 fork 也照此办理。**
 
-顺带一个同源的坑：工作区是 **CRLF**，用 `\n` 写多行锚点会匹配 0 次，
-报错长得像"锚点写错了"，实际是行尾不对。
+顺带一个同源的坑：**行尾随平台，不是本仓库的固定属性**。那台 Windows 机器上工作区是 **CRLF**，
+用 `\n` 写多行锚点会匹配 0 次，报错长得像"锚点写错了"，实际是行尾不对；
+而这台 Mac 上检出的**全部是 LF**（实测 5 个关键文件 `crlf=0`）。别把平台结论当成仓库属性。
+
+**2026-09-24 追加 —— 本节引用的技能当时并不存在，同一类坑又踩了一次。**
+
+`android-edit-verify-offline` 在本机 `~/.workbuddy-ai/skills/` 下**没有**（只有 `probe-selfhosted-app-settings` 与 `verify-browser-assertions-cdp`），`scripts/patch_text.py` 同样找不到。
+于是补 `MimeType` 的 import 时又犯了一次：**两条 Edit 放进同一条消息** → 同文件并发写，
+**后一条覆盖了前一条**，import 静默丢失。而引用处（`MimeType.FONT`）在，`grep` 看着"改好了"，
+实际是编译错误 —— 和本节开头那 3 处一模一样的形态。
+
+**两条硬规则（已写进技能）**：
+
+1. **同一个文件的多处改动，永远不要放进同一条消息**（不同文件之间并行是安全的）。
+2. 收尾必须跑一遍**断言**而不是重读代码：括号平衡、import 可达性、XML 良构、关键声明存在。
+   本机没有 JDK / Android SDK，编译只能在 CI 跑，所以这四支离线脚本是唯一的低成本拦截点。
 
 ### 9.4 明确没做（省得将来重复考虑）
 
