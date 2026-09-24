@@ -679,3 +679,36 @@ git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
 > 反面教材：`Build Commit` 日志里的 `:mergeGithubReleaseArtProfile` /
 > `:expandGithubReleaseArtProfileWildcards` / `:compileGithubReleaseArtProfile` **不能**当作
 > 「源集 profile 被读取了」的判据——只有 library 自带的 profile 时这些任务照样会跑、照样零告警。
+
+---
+
+### 9.7 平板缩放与字体收尾的核验结果（2026-09-24）
+
+提交：`0430da91`（feat）→ `e5e90e95`（docs）→ `2a4c5871`（chore），一次 push。
+
+| 项 | 结果 |
+|---|---|
+| `Build Commit`（`2a4c5871`） | success |
+| `Unit Tests`（`2a4c5871`） | **success**，且「字体基线守卫是否真的跑了」那一步也是 success |
+| `Fork Auto Release`（`2a4c5871`） | success，发布 **`v0.16.2-tablet.11`** |
+| APK | `ReadYou-0.16.2-2a4c5871.apk` **11,081,872 B**（tablet.8 是 11,078,008 B，**+3,864 B**） |
+
+**为什么 `Unit Tests` 绿就等于「主源集也编译通过」**：`testGithubReleaseUnitTest` 会先编译
+`GithubRelease` 变体的主源集，再编译并运行单测。所以这一个 job 同时覆盖了
+「生产代码能编译」与「单测全过」两件事。
+
+**为什么能确定 `AdaptiveScaleTest` 真的被执行了**（而不是被放进了一个不参与编译的源集）：
+`app/build.gradle.kts` **没有** `sourceSets` 覆写，所以 `app/src/test/java/...` 是全部 flavor
+共享的单测源集。`fork-unit-tests.yaml` 里那步「断言 `TEST-*ListFontBaselineTest.xml` 存在」绿了，
+就证明这个源集确实被编译并运行了 —— 同一个源集里的 `AdaptiveScaleTest` 若编译不过，整个 job 会红。
+
+**本轮没能取到确切的测试用例数**：报告产物与作业日志在公开仓库上仍需鉴权，而本机既没有 `gh`
+也没有 token。可用的间接证据是 job 全绿 + 守卫步骤绿。将来若要拿到数字，不必去解决鉴权 ——
+在 CI 里把 `test-results/*.xml` 的摘要 `cat` 进 `$GITHUB_STEP_SUMMARY` 即可。
+
+**离线核验（push 前，本机无 JDK）**：括号平衡 22 个文件、import 可达性 21 个文件、
+`strings.xml` 三个 locale 良构且无重名（386 / 355 / 349 条）、关键声明断言 —— 全过。
+方法与脚本见技能 `android-edit-verify-offline`。
+
+**规模参考**：本轮 APK 只涨 3,864 B —— 缩放层是纯参数改动，没有新增依赖、没有新增资源，
+连新增的 3 条字符串 × 3 个 locale 也只是几 KB 的 XML。
