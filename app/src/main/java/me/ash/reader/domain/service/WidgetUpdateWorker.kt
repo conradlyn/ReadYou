@@ -10,6 +10,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
@@ -35,7 +36,6 @@ constructor(
     @Assisted private val workerParams: WorkerParameters,
     private val repository: WidgetRepository,
 ) : CoroutineWorker(context, workerParams) {
-    var haveSetPreviews = false
 
     override suspend fun doWork(): Result {
 
@@ -50,18 +50,31 @@ constructor(
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     private suspend fun generatePreviews() {
-        if (haveSetPreviews) return
+        if (previewsSet) return
         val glanceManager = GlanceAppWidgetManager(context)
         val list = glanceManager.setWidgetPreviews(ArticleCardWidgetReceiver::class) == SET_WIDGET_PREVIEWS_RESULT_SUCCESS
         val card = glanceManager.setWidgetPreviews(ArticleListWidgetReceiver::class) == SET_WIDGET_PREVIEWS_RESULT_SUCCESS
-        haveSetPreviews = list and card
+        previewsSet = list and card
     }
 
     companion object {
         private const val WORK_NAME_PERIODIC = "WidgetUpdateWorker"
+        private const val WORK_NAME_ONE_TIME = "WidgetUpdateWorkerOneTime"
+
+        /**
+         * 原实现是 Worker 的**实例字段**，而 Worker 每次执行都是新实例，
+         * 所以「只设置一次预览」这个守卫从未生效过。改成进程级标记。
+         * 进程重启后会再设置一次，代价可接受。
+         */
+        @Volatile
+        private var previewsSet = false
 
         fun enqueueOneTimeWork(workManager: WorkManager) =
-            workManager.enqueue(OneTimeWorkRequestBuilder<WidgetUpdateWorker>().build())
+            workManager.enqueueUniqueWork(
+                WORK_NAME_ONE_TIME,
+                ExistingWorkPolicy.KEEP,
+                OneTimeWorkRequestBuilder<WidgetUpdateWorker>().build(),
+            )
 
         fun enqueuePeriodicWork(
             workManager: WorkManager,

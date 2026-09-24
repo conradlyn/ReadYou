@@ -20,7 +20,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
-import androidx.profileinstaller.ProfileInstallerInitializer
 import androidx.work.WorkManager
 import coil.ImageLoader
 import dagger.hilt.android.AndroidEntryPoint
@@ -62,7 +61,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.i("RLog", "onCreate: ${ProfileInstallerInitializer().create(this)}")
 
         enableEdgeToEdge()
 
@@ -78,7 +76,7 @@ class MainActivity : AppCompatActivity() {
             field.isAccessible = true
             field.set(null, 100 * 1024 * 1024) // 100MB is the new cursor window size
         } catch (e: Exception) {
-            Log.e("RLog", "Unable to increase cursor window size: ${e.printStackTrace()}")
+            Log.e("RLog", "Unable to increase cursor window size", e)
         }
 
         val requestPermissionLauncher =

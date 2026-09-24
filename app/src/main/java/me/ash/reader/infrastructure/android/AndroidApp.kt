@@ -3,7 +3,6 @@ package me.ash.reader.infrastructure.android
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import androidx.work.WorkManager
 import coil.Coil
 import coil.ImageLoader
 import dagger.hilt.android.HiltAndroidApp
@@ -17,20 +16,12 @@ import me.ash.reader.BuildConfig
 import me.ash.reader.domain.data.DiffMapHolder
 import me.ash.reader.domain.service.AccountService
 import me.ash.reader.domain.service.AppService
-import me.ash.reader.domain.service.LocalRssService
-import me.ash.reader.domain.service.OpmlService
 import me.ash.reader.domain.service.RssService
-import me.ash.reader.infrastructure.db.AndroidDatabase
 import me.ash.reader.infrastructure.di.ApplicationScope
 import me.ash.reader.infrastructure.di.IODispatcher
-import me.ash.reader.infrastructure.net.NetworkDataSource
-import me.ash.reader.infrastructure.preference.SettingsProvider
-import me.ash.reader.infrastructure.rss.OPMLDataSource
-import me.ash.reader.infrastructure.rss.RssHelper
 import me.ash.reader.ui.ext.del
 import me.ash.reader.ui.ext.getLatestApk
 import me.ash.reader.ui.ext.isGitHub
-import okhttp3.OkHttpClient
 import timber.log.Timber
 
 /** The Application class, where the Dagger components is generated. */
@@ -47,29 +38,11 @@ class AndroidApp : Application(), Configuration.Provider {
         // Security.insertProviderAt(Conscrypt.newProvider(), 1)
     }
 
-    @Inject lateinit var androidDatabase: AndroidDatabase
-
     @Inject lateinit var workerFactory: HiltWorkerFactory
-
-    @Inject lateinit var workManager: WorkManager
-
-    @Inject lateinit var networkDataSource: NetworkDataSource
-
-    @Inject lateinit var OPMLDataSource: OPMLDataSource
-
-    @Inject lateinit var rssHelper: RssHelper
-
-    @Inject lateinit var notificationHelper: NotificationHelper
 
     @Inject lateinit var appService: AppService
 
-    @Inject lateinit var androidStringsHelper: AndroidStringsHelper
-
     @Inject lateinit var accountService: AccountService
-
-    @Inject lateinit var localRssService: LocalRssService
-
-    @Inject lateinit var opmlService: OpmlService
 
     @Inject lateinit var rssService: RssService
 
@@ -77,14 +50,15 @@ class AndroidApp : Application(), Configuration.Provider {
 
     @Inject @IODispatcher lateinit var ioDispatcher: CoroutineDispatcher
 
-    @Inject lateinit var okHttpClient: OkHttpClient
-
     @Inject lateinit var imageLoader: ImageLoader
 
-    @Inject lateinit var imageDownloader: AndroidImageDownloader
-
-    @Inject lateinit var settingsProvider: SettingsProvider
-
+    /**
+     * 注意：本字段不直接引用，但**必须保留** —— 它的 `init{}` 订阅了 `currentAccountFlow`，
+     * 靠这个注入才会产生副作用。
+     *
+     * 其余未使用的 `lateinit var` 注入已移除：Hilt 的字段注入会在 Application 创建时
+     * 把所有字段全部实例化，全部落在冷启动路径、主线程上。
+     */
     @Inject lateinit var diffMapHolder: DiffMapHolder
 
     /**
@@ -114,7 +88,9 @@ class AndroidApp : Application(), Configuration.Provider {
             Configuration.Builder()
                 .setWorkerFactory(workerFactory)
                 .setWorkerCoroutineContext(Dispatchers.IO)
-                .setMinimumLoggingLevel(android.util.Log.DEBUG)
+                .setMinimumLoggingLevel(
+                    if (BuildConfig.DEBUG) android.util.Log.DEBUG else android.util.Log.WARN
+                )
                 .build()
 
     private suspend fun accountInit() {
