@@ -74,7 +74,7 @@ Mate 90 预计 2026-10~11 月出厂预装 7.0。**注意**：2026-08-05 发布�
 
 | Android 依赖 | 用途 | 使用面 | 鸿蒙出路 | 难度 |
 |---|---|---|---|---|
-| `compose-html` + 自研 reader | **HTML → 声明式富文本排版**（`ui/component/reader`，**1,921 行**） | 阅读页核心 | **ArkUI 无等价物**。鸿蒙富文本是 `RichText` + `StyledString`，能力显著弱于 Compose 的 inline content / 自定义 AnnotatedString | ★★★ 最高 |
+| 自研 reader（`jsoup` + Compose `AnnotatedString`） | **HTML → 声明式富文本排版**（`ui/component/reader`，**1,921 行**） | 阅读页核心 | **ArkUI 无等价物**，且 **`jsoup` 是 Java 库、鸿蒙无 JVM**，解析与排版两层都要按 ArkUI 重写 | ★★★ 最高 |
 | `android.webkit` + JS 注入桥 | 阅读器 WebView 模式（`ui/component/webview`，**887 行**，4 个文件） | 阅读页另一种渲染模式 | ArkUI `Web` 组件（Chromium 内核）可用，但 `JavaScriptInterface` → 需重写为 `javaScriptProxy`，且注入脚本（`WebViewScript.kt`）、样式注入（`WebViewStyle.kt`）、双向通信全部要重做 | ★★★ 高 |
 | **Glance** | 桌面小部件（`ui/widget`，**1,190 行**，6 文件） | 两个 widget | **ArkTS 服务卡片（Form）** —— 完全不同的声明式模型 + 独立编译目标 + 独立生命周期 | ★★★ 高 |
 | Kotlin Coroutines / Flow | 贯穿全项目 | 面极广 | ArkTS 用 `async/await` + `TaskPool`/`Worker`。**`Flow` 没有等价物**，全部分享流要重构为状态观察模型 | ★★★ 高（面积大） |
