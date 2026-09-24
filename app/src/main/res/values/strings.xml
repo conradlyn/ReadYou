@@ -200,7 +200,7 @@
     <string name="tips_top_bar_tonal_elevation">Tonal elevation for the top bar list is only available when scrolling</string>
     <string name="tips_article_list_tonal_elevation">Tonal elevation for the article list is only available in the light theme</string>
     <string name="tips_group_list_tonal_elevation">Tonal elevation for the group list is only available in the light theme</string>
-    <string name="tips_list_external_fonts">"External fonts" uses the font you imported on the reading page</string>
+    <string name="tips_list_external_fonts">"External fonts" uses the .ttf file you import for this page</string>
     <string name="share">Share</string>
     <string name="touch_to_play_video">Tap to play a video</string>
     <string name="text">Text</string>
@@ -394,4 +394,7 @@
     <string name="follow_page_font">Same as the page font</string>
     <string name="auto_fetch_full_content">Fetch full content on open</string>
     <string name="auto_fetch_full_content_desc">Fetch the full article from its webpage as soon as it opens, instead of tapping \"Parse full content\"</string>
+    <string name="import_font">Import font</string>
+    <string name="imported">Imported</string>
+    <string name="not_imported">Nothing imported yet</string>
 </resources>

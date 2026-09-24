@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.size.Size
 import me.ash.reader.R
+import me.ash.reader.ui.adaptive.adaptiveScale
+import me.ash.reader.ui.adaptive.adaptiveSize
 import me.ash.reader.ui.component.base.Base64Image
 import me.ash.reader.ui.component.base.RYAsyncImage
 
@@ -41,9 +43,13 @@ fun FeedIcon(
     size: Dp = 20.dp,
     placeholderIcon: ImageVector? = null,
 ) {
+    // Scaled once, here, so every branch below draws the same circle: the base64 branch, the
+    // network branch and the letter fallback would otherwise disagree on a tablet. Identity on a
+    // phone, so the upstream appearance is untouched there.
+    val iconSize = adaptiveSize(size)
     if (iconUrl.isNullOrEmpty()) {
         if (placeholderIcon == null) {
-            FontIcon(modifier, size, feedName ?: "")
+            FontIcon(modifier, iconSize, feedName ?: "")
         } else {
             ImageIcon(modifier, placeholderIcon, feedName ?: "")
         }
@@ -52,15 +58,15 @@ fun FeedIcon(
     else if ("^image/.*;base64,.*".toRegex().matches(iconUrl)) {
         Base64Image(
             modifier = modifier
-                .size(size)
+                .size(iconSize)
                 .clip(CircleShape),
             base64Uri = iconUrl,
-            onEmpty = { FontIcon(modifier, size, feedName ?: "") },
+            onEmpty = { FontIcon(modifier, iconSize, feedName ?: "") },
         )
     } else {
         RYAsyncImage(
             modifier = modifier
-                .size(size)
+                .size(iconSize)
                 .clip(CircleShape),
             contentDescription = feedName ?: "",
             data = iconUrl,
@@ -81,6 +87,9 @@ private fun ImageIcon(modifier: Modifier, placeholderIcon: ImageVector, feedName
 
 @Composable
 private fun FontIcon(modifier: Modifier, size: Dp, feedName: String) {
+    // The letter is sized for a 20dp circle, so it has to grow with the circle or the fallback
+    // looks emptier on a tablet than it does on a phone.
+    val scale = adaptiveScale()
     Box(
         modifier = modifier
             .size(size)
@@ -92,7 +101,7 @@ private fun FontIcon(modifier: Modifier, size: Dp, feedName: String) {
             text = feedName.ifEmpty { " " }.first().toString(),
             style = MaterialTheme.typography.bodyMedium.merge(
                 color = MaterialTheme.colorScheme.onPrimary,
-                fontSize = 10.sp,
+                fontSize = if (scale == 1f) 10.sp else 10.sp * scale,
                 fontWeight = FontWeight.Bold,
             )
         )

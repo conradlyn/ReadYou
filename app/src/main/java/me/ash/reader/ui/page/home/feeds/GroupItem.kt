@@ -26,6 +26,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import me.ash.reader.R
 import me.ash.reader.domain.model.group.Group
 import me.ash.reader.domain.model.group.GroupWithFeed
+import me.ash.reader.ui.adaptive.adaptiveSize
 import me.ash.reader.ui.component.withFeedsListStyle
 import me.ash.reader.ui.page.home.feeds.drawer.group.GroupOptionViewModel
 import me.ash.reader.ui.theme.Shape32
@@ -75,7 +76,9 @@ fun GroupItem(
             Row(
                 modifier = Modifier
                     .padding(end = 20.dp)
-                    .size(24.dp)
+                    // The circle and the glyph grow together. Scaling only the glyph would overflow
+                    // the 24dp circle; scaling only the circle would leave the arrow looking lost.
+                    .size(adaptiveSize(24.dp))
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable { onExpanded() },
@@ -83,6 +86,7 @@ fun GroupItem(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
+                    modifier = Modifier.size(adaptiveSize(24.dp)),
                     imageVector = if (isExpanded()) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
                     contentDescription = stringResource(if (isExpanded()) R.string.expand_less else R.string.expand_more),
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,

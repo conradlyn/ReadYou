@@ -150,7 +150,7 @@ fun TipsAndSupportPage(
         },
         actions = {
             FeedbackIconButton(
-                modifier = Modifier.size(20.dp),
+                iconSize = 20.dp,
                 imageVector = Icons.Rounded.Balance,
                 contentDescription = stringResource(R.string.open_source_licenses),
                 tint = MaterialTheme.colorScheme.onSurface,

@@ -17,7 +17,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import me.ash.reader.ui.adaptive.adaptiveSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +30,15 @@ fun FeedbackIconButton(
     tint: Color = LocalContentColor.current,
     enabled: Boolean = true,
     showBadge: Boolean = false,
+    /**
+     * Size of the glyph. Lives here rather than in [modifier] so that it can be scaled for the
+     * window size class - a size passed through [modifier] would be applied verbatim and would
+     * quietly opt the caller out of the tablet adaptation.
+     *
+     * The default matches what the `Icon` composable would have used anyway (the vector's own
+     * 24dp), so call sites that pass nothing are unchanged apart from the scaling itself.
+     */
+    iconSize: Dp = 24.dp,
     isHaptic: Boolean? = true,
     isSound: Boolean? = true,
     onClick: () -> Unit = {},
@@ -56,7 +67,7 @@ fun FeedbackIconButton(
             },
         ) {
             Icon(
-                modifier = modifier,
+                modifier = modifier.size(adaptiveSize(iconSize)),
                 imageVector = imageVector,
                 contentDescription = contentDescription,
                 tint = tint,

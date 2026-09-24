@@ -169,7 +169,7 @@
     <string name="tips_top_bar_tonal_elevation">标题栏列表的色调海拔仅在滚动时可用</string>
     <string name="tips_article_list_tonal_elevation">文章列表的色调海拔仅在亮色主题时可用</string>
     <string name="tips_group_list_tonal_elevation">分组列表的色调海拔仅在亮色主题时可用</string>
-    <string name="tips_list_external_fonts">“External fonts” 会使用你在阅读页导入的字体</string>
+    <string name="tips_list_external_fonts">“External fonts” 会使用你为本页导入的 .ttf 字体</string>
     <string name="share">分享</string>
     <string name="touch_to_play_video">轻触播放视频</string>
     <string name="text">文本</string>
@@ -358,4 +358,7 @@
     <string name="follow_page_font">跟随页面字体</string>
     <string name="auto_fetch_full_content">自动拉取全文</string>
     <string name="auto_fetch_full_content_desc">打开文章时直接拉取全文，无需再点“全文解析”</string>
+    <string name="import_font">导入字体</string>
+    <string name="imported">已导入</string>
+    <string name="not_imported">尚未导入</string>
 </resources>

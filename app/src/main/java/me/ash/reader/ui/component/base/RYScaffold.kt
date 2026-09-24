@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.ash.reader.ui.adaptive.LocalAvailableWidthDp
+import me.ash.reader.ui.adaptive.adaptiveSize
 import me.ash.reader.ui.adaptive.rememberAdaptiveContentGutter
 import me.ash.reader.ui.ext.surfaceColorAtElevation
 import me.ash.reader.ui.theme.palette.onDark
@@ -68,6 +69,12 @@ fun RYScaffold(
                     else if (navigationIcon != null || actions != null) {
                         TopAppBar(
                             title = {},
+                            // Grows with the icons below it. The two have to move together: a 30dp
+                            // glyph in a 64dp bar reads as cramped, and a 64dp bar with 30dp glyphs
+                            // reads as a mistake. `expandedHeight` is the only way to change a
+                            // Material 3 `TopAppBar` height - its internal Row hard-codes the
+                            // token, so a `Modifier.height()` on the bar is ignored.
+                            expandedHeight = adaptiveSize(TopAppBarDefaults.TopAppBarExpandedHeight),
                             navigationIcon = {
                                 // Padding the icons rather than the bar: the bar keeps its own
                                 // full-bleed surface, only the back arrow moves in, so it lines up

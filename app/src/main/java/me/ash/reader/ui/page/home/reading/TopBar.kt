@@ -123,7 +123,7 @@ fun TopBar(
                     },
                     actions = {
                         FeedbackIconButton(
-                            modifier = Modifier.size(22.dp),
+                            iconSize = 22.dp,
                             imageVector = Icons.Outlined.Palette,
                             contentDescription = stringResource(R.string.style),
                             tint = MaterialTheme.colorScheme.onSurface,
@@ -131,7 +131,7 @@ fun TopBar(
                             onNavigateToStylePage()
                         }
                         FeedbackIconButton(
-                            modifier = Modifier.size(20.dp),
+                            iconSize = 20.dp,
                             imageVector = Icons.Outlined.Share,
                             contentDescription = stringResource(R.string.share),
                             tint = MaterialTheme.colorScheme.onSurface,

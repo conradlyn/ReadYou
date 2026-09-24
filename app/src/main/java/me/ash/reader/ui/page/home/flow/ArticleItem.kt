@@ -70,6 +70,7 @@ import me.ash.reader.infrastructure.preference.LocalFlowArticleListReadIndicator
 import me.ash.reader.infrastructure.preference.LocalFlowArticleListTime
 import me.ash.reader.infrastructure.preference.SwipeEndActionPreference
 import me.ash.reader.infrastructure.preference.SwipeStartActionPreference
+import me.ash.reader.ui.adaptive.adaptiveSize
 import me.ash.reader.ui.component.FeedIcon
 import me.ash.reader.ui.component.base.RYAsyncImage
 import me.ash.reader.ui.component.base.SIZE_1000
@@ -576,6 +577,11 @@ fun ArticleItemMenuContent(
     onShare: ((ArticleWithFeed) -> Unit)? = null,
     onItemClick: (() -> Unit)? = null,
 ) {
+    // Scaled here rather than by the caller so that every entry in the menu grows by the same
+    // factor as the icons in the list that opened it.
+    val menuIconSize =
+        DpSize(adaptiveSize(iconSize.width), adaptiveSize(iconSize.height))
+
     val starImageVector =
         remember(isStarred) { if (isStarred) Icons.Outlined.StarOutline else Icons.Rounded.Star }
 
@@ -599,7 +605,7 @@ fun ArticleItemMenuContent(
             Icon(
                 imageVector = readImageVector,
                 contentDescription = null,
-                modifier = Modifier.size(iconSize),
+                modifier = Modifier.size(menuIconSize),
             )
         },
     )
@@ -613,7 +619,7 @@ fun ArticleItemMenuContent(
             Icon(
                 imageVector = starImageVector,
                 contentDescription = null,
-                modifier = Modifier.size(iconSize),
+                modifier = Modifier.size(menuIconSize),
             )
         },
     )
@@ -632,7 +638,7 @@ fun ArticleItemMenuContent(
                 Icon(
                     imageVector = Icons.Rounded.ArrowUpward,
                     contentDescription = null,
-                    modifier = Modifier.size(iconSize),
+                    modifier = Modifier.size(menuIconSize),
                 )
             },
         )
@@ -648,7 +654,7 @@ fun ArticleItemMenuContent(
                 Icon(
                     imageVector = Icons.Rounded.ArrowDownward,
                     contentDescription = null,
-                    modifier = Modifier.size(iconSize),
+                    modifier = Modifier.size(menuIconSize),
                 )
             },
         )
@@ -665,7 +671,7 @@ fun ArticleItemMenuContent(
                 Icon(
                     imageVector = Icons.Rounded.Share,
                     contentDescription = null,
-                    modifier = Modifier.size(iconSize),
+                    modifier = Modifier.size(menuIconSize),
                 )
             },
         )

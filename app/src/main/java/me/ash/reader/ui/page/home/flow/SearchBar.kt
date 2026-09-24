@@ -22,11 +22,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import me.ash.reader.R
 import me.ash.reader.domain.model.constant.ElevationTokens
+import me.ash.reader.ui.adaptive.adaptiveSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +36,12 @@ fun SearchBar(
     value: String,
     placeholder: String = "",
     focusRequester: FocusRequester = remember { FocusRequester() },
+    /**
+     * Style for the field and its placeholder. Defaults to the upstream `bodyLarge`, so a caller
+     * that passes nothing is unchanged; the flow page passes its list style so the search box stops
+     * ignoring the font the user picked for the page it sits on.
+     */
+    textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
     onValueChange: (String) -> Unit = {},
     onClose: () -> Unit = {},
 ) {
@@ -41,12 +49,17 @@ fun SearchBar(
 
     var input by remember { mutableStateOf(value) }
 
+    // One measurement drives both the surface and the field inside it; if they disagree the field
+    // is clipped by its parent.
+    val barHeight = adaptiveSize(56.dp)
+    val iconSize = adaptiveSize(24.dp)
+
     Surface(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 24.dp)
             .padding(vertical = 12.dp)
-            .height(56.dp)
+            .height(barHeight)
             .fillMaxWidth(),
         shape = CircleShape,
         tonalElevation = ElevationTokens.Level2.dp
@@ -61,14 +74,14 @@ fun SearchBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    modifier = Modifier.padding(start = 16.dp),
+                    modifier = Modifier.padding(start = 16.dp).size(iconSize),
                     imageVector = Icons.Rounded.Search,
                     contentDescription = stringResource(R.string.search),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 TextField(
                     modifier = Modifier
-                        .height(56.dp)
+                        .height(barHeight)
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
                     colors = TextFieldDefaults.colors(
@@ -88,13 +101,13 @@ fun SearchBar(
                         Text(
                             modifier = Modifier.alpha(0.7f),
                             text = placeholder,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = textStyle,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     },
-                    textStyle = MaterialTheme.typography.bodyLarge,
+                    textStyle = textStyle,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Done
@@ -108,6 +121,7 @@ fun SearchBar(
             }
             IconButton(onClick = { onClose() }) {
                 Icon(
+                    modifier = Modifier.size(iconSize),
                     imageVector = Icons.Rounded.Close,
                     contentDescription = stringResource(R.string.clear),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,

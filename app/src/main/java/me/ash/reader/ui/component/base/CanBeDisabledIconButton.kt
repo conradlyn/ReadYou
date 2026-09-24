@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import me.ash.reader.ui.adaptive.adaptiveSize
 
 @Composable
 fun CanBeDisabledIconButton(
@@ -37,7 +38,7 @@ fun CanBeDisabledIconButton(
     ) {
         if (imageVector != null) {
             Icon(
-                modifier = Modifier.size(size),
+                modifier = Modifier.size(adaptiveSize(size)),
                 imageVector = imageVector,
                 contentDescription = contentDescription,
             )

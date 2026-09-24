@@ -1,5 +1,7 @@
 package me.ash.reader.ui.page.settings.color.feeds
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,6 +22,9 @@ import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.*
 import me.ash.reader.infrastructure.preference.FeedsTextFontSizePreference.coerceToRange
 import me.ash.reader.ui.component.base.*
+import me.ash.reader.ui.ext.ListExternalFonts
+import me.ash.reader.ui.ext.MimeType
+import me.ash.reader.ui.ext.showToast
 import me.ash.reader.ui.page.settings.SettingItem
 import me.ash.reader.ui.theme.palette.onLight
 
@@ -51,6 +56,25 @@ fun FeedsPageStylePage(
     var fontSizeDialogVisible by remember { mutableStateOf(false) }
 
     var fontSizeValue: Int? by remember { mutableStateOf(fontSize) }
+
+    // Read so that the row below re-reads the slot after an import. The file appears on disk before
+    // the preference changes, and re-importing into an already-`External` slot changes no
+    // preference at all, so the generation counter is the only reliable invalidation.
+    val fontGeneration = ListExternalFonts.generation(ListExternalFonts.Slot.Feeds)
+    val hasImportedFont =
+        remember(fontGeneration) {
+            ListExternalFonts.hasFont(context, ListExternalFonts.Slot.Feeds)
+        }
+
+    val fontLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let {
+                ListExternalFonts.import(context, it, ListExternalFonts.Slot.Feeds)
+                // Also selects External: importing a font and then leaving the page on a different
+                // family would look exactly like the import having failed.
+                FeedsFontsPreference.put(context, scope, ListFontsPreference.External)
+            } ?: context.showToast("Cannot get activity result with launcher")
+        }
 
     RYScaffold(
         containerColor = MaterialTheme.colorScheme.surface onLight MaterialTheme.colorScheme.inverseOnSurface,
@@ -110,6 +134,14 @@ fun FeedsPageStylePage(
                         title = stringResource(R.string.font_size),
                         desc = "${fontSize}sp",
                         onClick = { fontSizeDialogVisible = true },
+                    ) {}
+                    SettingItem(
+                        title = stringResource(R.string.import_font),
+                        desc =
+                            stringResource(
+                                if (hasImportedFont) R.string.imported else R.string.not_imported
+                            ),
+                        onClick = { fontLauncher.launch(arrayOf(MimeType.FONT)) },
                     ) {}
                     Tips(text = stringResource(R.string.tips_list_external_fonts))
                     Spacer(modifier = Modifier.height(24.dp))
@@ -263,7 +295,10 @@ fun FeedsPageStylePage(
         options = ListFontsPreference.values.map {
             RadioDialogOption(
                 text = it.toDesc(context),
-                style = it.asFontFamily(context)?.let { family -> TextStyle(fontFamily = family) },
+                style =
+                    it.asFontFamily(context, ListExternalFonts.Slot.Feeds)?.let { family ->
+                        TextStyle(fontFamily = family)
+                    },
                 selected = it == fonts,
             ) {
                 FeedsFontsPreference.put(context, scope, it)

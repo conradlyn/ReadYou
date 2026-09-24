@@ -42,7 +42,7 @@ fun LicenseListPage(
         },
         actions = {
             FeedbackIconButton(
-                modifier = Modifier.size(20.dp),
+                iconSize = 20.dp,
                 imageVector = Icons.Rounded.Star,
                 contentDescription = stringResource(R.string.open_source_licenses),
                 tint = MaterialTheme.colorScheme.onSurface

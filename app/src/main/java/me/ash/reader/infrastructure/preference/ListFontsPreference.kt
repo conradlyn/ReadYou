@@ -3,7 +3,7 @@ package me.ash.reader.infrastructure.preference
 import android.content.Context
 import androidx.compose.ui.text.font.FontFamily
 import me.ash.reader.R
-import me.ash.reader.ui.ext.ExternalFonts
+import me.ash.reader.ui.ext.ListExternalFonts
 import me.ash.reader.ui.theme.GoogleSansFontFamily
 
 /**
@@ -31,8 +31,14 @@ sealed class ListFontsPreference(val value: Int) {
 
     object External : ListFontsPreference(5)
 
-    /** `null` means "no override", i.e. keep the app theme font. */
-    fun asFontFamily(context: Context): FontFamily? =
+    /**
+     * `null` means "no override", i.e. keep the app theme font.
+     *
+     * [externalSlot] says which imported font [External] resolves to. Both list pages share this
+     * enum but not their import, so the slot has to come from the caller rather than from the
+     * preference value.
+     */
+    fun asFontFamily(context: Context, externalSlot: ListExternalFonts.Slot): FontFamily? =
         when (this) {
             Default -> null
             GoogleSans -> GoogleSansFontFamily
@@ -41,9 +47,7 @@ sealed class ListFontsPreference(val value: Int) {
             SansSerif -> FontFamily.SansSerif
             Monospace -> FontFamily.Monospace
             Cursive -> FontFamily.Cursive
-            External ->
-                ExternalFonts.loadReadingTypography(context).displayLarge.fontFamily
-                    ?: FontFamily.Default
+            External -> ListExternalFonts.load(context, externalSlot) ?: FontFamily.Default
         }
 
     fun toDesc(context: Context): String =

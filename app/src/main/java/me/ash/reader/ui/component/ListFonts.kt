@@ -1,17 +1,20 @@
 package me.ash.reader.ui.component
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.TextUnit
 import me.ash.reader.infrastructure.preference.FeedsTextFontSizePreference
 import me.ash.reader.infrastructure.preference.FlowTextFontSizePreference
+import me.ash.reader.infrastructure.preference.ListFontsPreference
 import me.ash.reader.infrastructure.preference.LocalFeedsFonts
 import me.ash.reader.infrastructure.preference.LocalFeedsTextFontSize
 import me.ash.reader.infrastructure.preference.LocalFlowFonts
 import me.ash.reader.infrastructure.preference.LocalFlowTextFontSize
 import me.ash.reader.infrastructure.preference.LocalFlowTitleFonts
+import me.ash.reader.ui.ext.ListExternalFonts
 
 /**
  * Applies the feeds page font family and font size to one of its list text styles.
@@ -23,7 +26,7 @@ import me.ash.reader.infrastructure.preference.LocalFlowTitleFonts
 @Composable
 fun TextStyle.withFeedsListStyle(): TextStyle =
     withListStyle(
-        fontFamily = LocalFeedsFonts.current.asFontFamily(LocalContext.current),
+        fontFamily = listFontFamily(LocalFeedsFonts.current, ListExternalFonts.Slot.Feeds),
         sizeSp = LocalFeedsTextFontSize.current,
         baselineSp = FeedsTextFontSizePreference.baseline,
     )
@@ -32,7 +35,7 @@ fun TextStyle.withFeedsListStyle(): TextStyle =
 @Composable
 fun TextStyle.withFlowListStyle(): TextStyle =
     withListStyle(
-        fontFamily = LocalFlowFonts.current.asFontFamily(LocalContext.current),
+        fontFamily = listFontFamily(LocalFlowFonts.current, ListExternalFonts.Slot.Flow),
         sizeSp = LocalFlowTextFontSize.current,
         baselineSp = FlowTextFontSizePreference.baseline,
     )
@@ -47,11 +50,32 @@ fun TextStyle.withFlowListStyle(): TextStyle =
 fun TextStyle.withFlowTitleStyle(): TextStyle =
     withListStyle(
         fontFamily =
-            LocalFlowTitleFonts.current.asFontFamily(LocalContext.current)
-                ?: LocalFlowFonts.current.asFontFamily(LocalContext.current),
+            LocalFlowTitleFonts.current
+                .asFontFamily(LocalContext.current, ListExternalFonts.Slot.Flow)
+                ?: listFontFamily(LocalFlowFonts.current, ListExternalFonts.Slot.Flow),
         sizeSp = LocalFlowTextFontSize.current,
         baselineSp = FlowTextFontSizePreference.baseline,
     )
+
+/**
+ * Resolves a list page's font family, re-reading it when the page's imported file is replaced.
+ *
+ * The [ListExternalFonts.generation] read is the whole point of this wrapper. Picking `External`
+ * stores the same preference value whether or not a font has been imported, so importing a *second*
+ * file into an already-`External` slot changes no preference at all - without this key the cached
+ * `FontFamily` would survive and the new file would only appear after an app restart.
+ */
+@Composable
+private fun listFontFamily(
+    preference: ListFontsPreference,
+    slot: ListExternalFonts.Slot,
+): FontFamily? {
+    val context = LocalContext.current
+    val generation = ListExternalFonts.generation(slot)
+    return remember(preference, generation, context) {
+        preference.asFontFamily(context, slot)
+    }
+}
 
 @Composable
 private fun TextStyle.withListStyle(

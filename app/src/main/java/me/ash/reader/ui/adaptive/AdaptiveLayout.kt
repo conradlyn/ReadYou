@@ -25,25 +25,54 @@ import androidx.compose.ui.unit.dp
 val AdaptiveContentMaxWidth: Dp = 640.dp
 
 /**
+ * How much icons and control heights grow on a tablet, per size class.
+ *
+ * Material's sizes are tuned for a phone, and dp is an absolute unit - a 24dp icon is the same
+ * physical size on an 8.8" tablet as on a 6" phone, so on the tablet it reads as undersized. These
+ * multipliers restore the *relative* proportion instead of leaving the user with a phone interface
+ * stretched over a larger screen.
+ *
+ * Deliberately mild. This is not a zoom: the icons grow by 15-25%, not by the 40-60% that a naive
+ * "scale with the diagonal" calculation would suggest. Past roughly 1.3 the glyphs start to crowd
+ * the fixed 40dp `IconButton` container they sit in, and the bar heights have to grow with them to
+ * keep the result from looking cramped.
+ *
+ * [AppSizeClass.Medium] matters more than it looks: an 8.8" tablet held in portrait is about 800dp
+ * wide, which is Medium, not Expanded. Skipping Medium would mean the adaptation disappears in the
+ * orientation this app is most often read in.
+ */
+const val AdaptiveScaleCompact = 1f
+const val AdaptiveScaleMedium = 1.15f
+const val AdaptiveScaleExpanded = 1.25f
+
+/**
  * Everything the layout layer exposes to screens.
  *
  * Screens read this through [LocalAdaptiveLayout] instead of hardcoding dp. Keeping every
  * size-related decision in one value object means adding a new dimension later is a change in this
  * file only, not a sweep across every component.
  */
-data class AdaptiveLayoutSpec(val sizeClass: AppSizeClass, val contentMaxWidth: Dp) {
+data class AdaptiveLayoutSpec(
+    val sizeClass: AppSizeClass,
+    val contentMaxWidth: Dp,
+    val scale: Float,
+) {
     companion object {
         /**
          * A phone must render identically to upstream, otherwise this whole layer becomes a
          * behavioural fork that upstream has a reason to reject — and a reason to conflict with.
          * [Compact] therefore carries no adaptation at all: the content gutter resolves to exactly
-         * zero (see `rememberAdaptiveContentGutter`) and no other dimension is touched.
+         * zero (see `rememberAdaptiveContentGutter`), the scale is exactly 1 (see `adaptiveSize`)
+         * and no other dimension is touched.
          */
-        val Compact = AdaptiveLayoutSpec(AppSizeClass.Compact, AdaptiveContentMaxWidth)
+        val Compact =
+            AdaptiveLayoutSpec(AppSizeClass.Compact, AdaptiveContentMaxWidth, AdaptiveScaleCompact)
 
-        val Medium = AdaptiveLayoutSpec(AppSizeClass.Medium, AdaptiveContentMaxWidth)
+        val Medium =
+            AdaptiveLayoutSpec(AppSizeClass.Medium, AdaptiveContentMaxWidth, AdaptiveScaleMedium)
 
-        val Expanded = AdaptiveLayoutSpec(AppSizeClass.Expanded, AdaptiveContentMaxWidth)
+        val Expanded =
+            AdaptiveLayoutSpec(AppSizeClass.Expanded, AdaptiveContentMaxWidth, AdaptiveScaleExpanded)
 
         fun of(sizeClass: AppSizeClass): AdaptiveLayoutSpec =
             when (sizeClass) {

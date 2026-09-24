@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectableGroup
@@ -22,12 +23,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.ash.reader.domain.model.general.Filter
 import me.ash.reader.infrastructure.preference.FlowFilterBarStylePreference
 import me.ash.reader.infrastructure.preference.LocalThemeIndex
+import me.ash.reader.ui.adaptive.adaptiveSize
 import me.ash.reader.ui.ext.surfaceColorAtElevation
 import me.ash.reader.ui.theme.palette.onDark
 
@@ -40,6 +43,10 @@ import me.ash.reader.ui.theme.palette.onDark
  * @param leading optional extra action pinned to the left of the filter items, inside the same
  *   padding as they are. Defaulted to null so every existing call site keeps the upstream layout,
  *   and so a merge from upstream sees at most a two-line conflict here.
+ * @param labelStyle style for the filter labels. Defaulted to null, which leaves the inherited
+ *   `LocalTextStyle` in place - byte-identical to upstream, where the `style` argument is not passed
+ *   at all. Callers that want the bar to follow their page's list font pass the same style the page
+ *   gives its list rows, so the bar stops being the one surface that ignores the font setting.
  */
 @Composable
 fun FilterBar(
@@ -51,6 +58,7 @@ fun FilterBar(
     filterBarTonalElevation: Dp,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     leading: (@Composable () -> Unit)? = null,
+    labelStyle: TextStyle? = null,
     filterOnClick: (Filter) -> Unit = {},
 ) {
     val view = LocalView.current
@@ -61,10 +69,14 @@ fun FilterBar(
         MaterialTheme.colorScheme.primaryContainer
     } onDark MaterialTheme.colorScheme.secondaryContainer
 
-    val containerHeight = when (filterBarStyle) {
-        FlowFilterBarStylePreference.Icon.value -> 64.dp
-        else -> 80.dp
-    }
+    // Scaled with the icons it holds: the bar exists to give them room, so growing one without the
+    // other would just add padding.
+    val containerHeight = adaptiveSize(
+        when (filterBarStyle) {
+            FlowFilterBarStylePreference.Icon.value -> 64.dp
+            else -> 80.dp
+        }
+    )
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(filterBarTonalElevation),
@@ -109,6 +121,7 @@ fun FilterBar(
                     },
                     icon = {
                         Icon(
+                            modifier = Modifier.size(adaptiveSize(24.dp)),
                             imageVector = if (filter == item && filterBarFilled) {
                                 item.iconFilled
                             } else {
@@ -123,7 +136,10 @@ fun FilterBar(
                         {
                             Text(
                                 text = item.toName(),
-//                            style = MaterialTheme.typography.labelLarge,
+                                // Null leaves `Text`'s own default in place, which is the inherited
+                                // `LocalTextStyle` that `NavigationBarItem` provides - i.e. exactly
+                                // what upstream gets by not passing `style` at all.
+                                style = labelStyle ?: LocalTextStyle.current,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )

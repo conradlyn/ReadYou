@@ -94,6 +94,7 @@ import me.ash.reader.infrastructure.preference.LocalSortUnreadArticles
 import me.ash.reader.infrastructure.preference.MarkAsReadButtonPositionPreference
 import me.ash.reader.infrastructure.preference.PullToLoadNextFeedPreference
 import me.ash.reader.infrastructure.preference.SortUnreadArticlesPreference
+import me.ash.reader.ui.adaptive.adaptiveSize
 import me.ash.reader.ui.component.FilterBar
 import me.ash.reader.ui.component.base.FeedbackIconButton
 import me.ash.reader.ui.component.base.RYExtensibleVisibility
@@ -101,6 +102,7 @@ import me.ash.reader.ui.component.base.RYScaffold
 import me.ash.reader.ui.component.scrollbar.VerticalScrollIndicatorFactory
 import me.ash.reader.ui.component.scrollbar.drawVerticalScrollIndicator
 import me.ash.reader.ui.component.scrollbar.scrollIndicator
+import me.ash.reader.ui.component.withFlowListStyle
 import me.ash.reader.ui.ext.collectAsStateValue
 import me.ash.reader.ui.ext.openURL
 import me.ash.reader.ui.motion.Direction
@@ -414,7 +416,7 @@ fun FlowPage(
                                 )
                             }
                         },
-                        expandedHeight = 172.dp,
+                        expandedHeight = adaptiveSize(172.dp),
                         scrollBehavior = scrollBehavior,
                         navigationIcon = {
                             FeedbackIconButton(
@@ -504,6 +506,8 @@ fun FlowPage(
                                     )
                             },
                         focusRequester = focusRequester,
+                        // Follows this page's list font, so the search box matches the list under it.
+                        textStyle = MaterialTheme.typography.bodyLarge.withFlowListStyle(),
                         onValueChange = { viewModel.inputSearchContent(it) },
                         onClose = {
                             onSearch = false
@@ -760,6 +764,8 @@ fun FlowPage(
                         filterBarPadding = filterBarPadding.dp,
                         filterBarTonalElevation = filterBarTonalElevation.value.dp,
                         leading = markAsReadButtonLeading,
+                        // The bar is part of this page, so it follows this page's font.
+                        labelStyle = MaterialTheme.typography.labelLarge.withFlowListStyle(),
                     ) {
                         if (filterUiState.filter != it) {
                             viewModel.changeFilter(filterUiState.copy(filter = it))

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.text.font.FontFamily
 import me.ash.reader.R
 import me.ash.reader.ui.ext.ExternalFonts
+import me.ash.reader.ui.ext.ListExternalFonts
 import me.ash.reader.ui.theme.GoogleSansFontFamily
 
 /**
@@ -51,6 +52,22 @@ sealed class TitleFontsPreference(val value: Int) {
             External ->
                 ExternalFonts.loadReadingTypography(context).displayLarge.fontFamily
                     ?: FontFamily.Default
+        }
+
+    /**
+     * Same as [asFontFamily], except that [External] resolves to [externalSlot]'s imported font
+     * rather than the reading page's.
+     *
+     * This enum is shared by the flow page's title and the reading page's title, so [External]
+     * cannot mean one fixed font. The flow page passes its own slot, which is what lets its title
+     * row honour the font imported on that page; the reading page keeps the single-argument overload
+     * and therefore keeps meaning the reading font, unchanged.
+     */
+    fun asFontFamily(context: Context, externalSlot: ListExternalFonts.Slot): FontFamily? =
+        if (this == External) {
+            ListExternalFonts.load(context, externalSlot) ?: FontFamily.Default
+        } else {
+            asFontFamily(context)
         }
 
     fun toDesc(context: Context): String =

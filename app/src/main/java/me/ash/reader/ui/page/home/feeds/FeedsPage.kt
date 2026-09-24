@@ -70,6 +70,7 @@ import me.ash.reader.infrastructure.preference.LocalFeedsGroupListTonalElevation
 import me.ash.reader.infrastructure.preference.LocalFeedsTopBarTonalElevation
 import me.ash.reader.infrastructure.preference.LocalNewVersionNumber
 import me.ash.reader.infrastructure.preference.LocalSkipVersionNumber
+import me.ash.reader.ui.adaptive.adaptiveSize
 import me.ash.reader.ui.adaptive.rememberAdaptiveContentGutter
 import me.ash.reader.ui.adaptive.rememberAdaptiveContentPadding
 import me.ash.reader.ui.component.FilterBar
@@ -77,6 +78,7 @@ import me.ash.reader.ui.component.base.DisplayText
 import me.ash.reader.ui.component.base.FeedbackIconButton
 import me.ash.reader.ui.component.base.RYScaffold
 import me.ash.reader.ui.component.scrollbar.drawVerticalScrollIndicator
+import me.ash.reader.ui.component.withFeedsListStyle
 import me.ash.reader.ui.ext.collectAsStateValue
 import me.ash.reader.ui.ext.currentAccountId
 import me.ash.reader.ui.ext.findActivity
@@ -210,10 +212,16 @@ fun FeedsPage(
                         interactionSource = remember { MutableInteractionSource() },
                     ),
                 title = {},
+                // Grows with the two icons below it. See `RYScaffold` for why this has to go through
+                // `expandedHeight` rather than a `Modifier.height` on the bar.
+                expandedHeight = adaptiveSize(TopAppBarDefaults.TopAppBarExpandedHeight),
                 navigationIcon = {
                     Box(modifier = Modifier.padding(start = adaptiveGutter)) {
                         FeedbackIconButton(
-                            modifier = Modifier.size(20.dp),
+                            // Was `Modifier.size(20.dp)`. Moved onto the parameter so the size can
+                            // be scaled for the window - a size inside `modifier` would be applied
+                            // verbatim and opt this icon out of the tablet adaptation.
+                            iconSize = 20.dp,
                             imageVector = Icons.Outlined.Settings,
                             contentDescription = stringResource(R.string.settings),
                             tint = MaterialTheme.colorScheme.onSurface,
@@ -287,9 +295,10 @@ fun FeedsPage(
                                 },
                                 modifier = Modifier
                                     .padding(end = 8.dp)
-                                    .size(28.dp),
+                                    .size(adaptiveSize(28.dp)),
                             ) {
                                 Icon(
+                                    modifier = Modifier.size(adaptiveSize(24.dp)),
                                     imageVector =
                                         if (hasGroupVisible) Icons.Rounded.UnfoldLess
                                         else Icons.Rounded.UnfoldMore,
@@ -366,6 +375,9 @@ fun FeedsPage(
                 filterBarPadding = filterBarPadding.dp,
                 filterBarTonalElevation = filterBarTonalElevation.value.dp,
                 contentPadding = rememberAdaptiveContentPadding(),
+                // The bar is part of this page, so it follows this page's font rather than staying
+                // the one surface that ignores it.
+                labelStyle = MaterialTheme.typography.labelLarge.withFeedsListStyle(),
             ) {
                 feedsViewModel.changeFilter(filterState.copy(filter = it))
             }
