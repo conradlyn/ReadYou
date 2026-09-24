@@ -397,4 +397,6 @@
     <string name="import_font">Import font</string>
     <string name="imported">Imported</string>
     <string name="not_imported">Nothing imported yet</string>
+    <string name="ui_text_scale">Interface text size</string>
+    <string name="ui_text_scale_desc">Settings pages and dialogs</string>
 </resources>

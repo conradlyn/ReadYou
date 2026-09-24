@@ -177,7 +177,7 @@ fun AppEntry(backStack: NavBackStack<NavKey>) {
                         }
                     }
                     Route.Settings ->
-                        NavEntry(key) {
+                        settingsNavEntry(key) {
                             SettingsPage(
                                 onBack = onBack,
                                 navigateToAccounts = { backStack.add(Route.Accounts) },
@@ -191,7 +191,7 @@ fun AppEntry(backStack: NavBackStack<NavKey>) {
                             )
                         }
                     Route.Accounts ->
-                        NavEntry(key) {
+                        settingsNavEntry(key) {
                             AccountsPage(
                                 onBack = onBack,
                                 navigateToAddAccount = { backStack.add(Route.AddAccounts) },
@@ -201,7 +201,7 @@ fun AppEntry(backStack: NavBackStack<NavKey>) {
                             )
                         }
                     is Route.AccountDetails ->
-                        NavEntry(key) {
+                        settingsNavEntry(key) {
                             AccountDetailsPage(
                                 viewModel =
                                     hiltViewModel<AccountViewModel>().also {
@@ -212,7 +212,7 @@ fun AppEntry(backStack: NavBackStack<NavKey>) {
                             )
                         }
                     Route.AddAccounts ->
-                        NavEntry(key) {
+                        settingsNavEntry(key) {
                             AddAccountsPage(
                                 onBack = onBack,
                                 navigateToAccountDetails = {
@@ -221,7 +221,7 @@ fun AppEntry(backStack: NavBackStack<NavKey>) {
                             )
                         }
                     Route.ColorAndStyle ->
-                        NavEntry(key) {
+                        settingsNavEntry(key) {
                             ColorAndStylePage(
                                 onBack = onBack,
                                 navigateToDarkTheme = { backStack.add(Route.DarkTheme) },
@@ -232,11 +232,11 @@ fun AppEntry(backStack: NavBackStack<NavKey>) {
                                 },
                             )
                         }
-                    Route.DarkTheme -> NavEntry(key) { DarkThemePage(onBack = onBack) }
-                    Route.FeedsPageStyle -> NavEntry(key) { FeedsPageStylePage(onBack = onBack) }
-                    Route.FlowPageStyle -> NavEntry(key) { FlowPageStylePage(onBack = onBack) }
+                    Route.DarkTheme -> settingsNavEntry(key) { DarkThemePage(onBack = onBack) }
+                    Route.FeedsPageStyle -> settingsNavEntry(key) { FeedsPageStylePage(onBack = onBack) }
+                    Route.FlowPageStyle -> settingsNavEntry(key) { FlowPageStylePage(onBack = onBack) }
                     Route.ReadingPageStyle ->
-                        NavEntry(key) {
+                        settingsNavEntry(key) {
                             ReadingStylePage(
                                 onBack = onBack,
                                 navigateToReadingBoldCharacters = {
@@ -257,22 +257,22 @@ fun AppEntry(backStack: NavBackStack<NavKey>) {
                             )
                         }
                     Route.ReadingBoldCharacters ->
-                        NavEntry(key) { BoldCharactersPage(onBack = onBack) }
-                    Route.ReadingPageTitle -> NavEntry(key) { ReadingTitlePage(onBack = onBack) }
-                    Route.ReadingPageText -> NavEntry(key) { ReadingTextPage(onBack = onBack) }
-                    Route.ReadingPageImage -> NavEntry(key) { ReadingImagePage(onBack = onBack) }
-                    Route.ReadingPageVideo -> NavEntry(key) { ReadingVideoPage(onBack = onBack) }
-                    Route.Interaction -> NavEntry(key) { InteractionPage(onBack = onBack) }
-                    Route.Languages -> NavEntry(key) { LanguagesPage(onBack = onBack) }
-                    Route.Troubleshooting -> NavEntry(key) { TroubleshootingPage(onBack = onBack) }
+                        settingsNavEntry(key) { BoldCharactersPage(onBack = onBack) }
+                    Route.ReadingPageTitle -> settingsNavEntry(key) { ReadingTitlePage(onBack = onBack) }
+                    Route.ReadingPageText -> settingsNavEntry(key) { ReadingTextPage(onBack = onBack) }
+                    Route.ReadingPageImage -> settingsNavEntry(key) { ReadingImagePage(onBack = onBack) }
+                    Route.ReadingPageVideo -> settingsNavEntry(key) { ReadingVideoPage(onBack = onBack) }
+                    Route.Interaction -> settingsNavEntry(key) { InteractionPage(onBack = onBack) }
+                    Route.Languages -> settingsNavEntry(key) { LanguagesPage(onBack = onBack) }
+                    Route.Troubleshooting -> settingsNavEntry(key) { TroubleshootingPage(onBack = onBack) }
                     Route.TipsAndSupport ->
-                        NavEntry(key) {
+                        settingsNavEntry(key) {
                             TipsAndSupportPage(
                                 onBack = onBack,
                                 navigateToLicenseList = { backStack.add(Route.LicenseList) },
                             )
                         }
-                    Route.LicenseList -> NavEntry(key) { LicenseListPage(onBack = onBack) }
+                    Route.LicenseList -> settingsNavEntry(key) { LicenseListPage(onBack = onBack) }
                     else -> NavEntry(key) { throw Exception("Unknown destination") }
                 }
             },

@@ -53,6 +53,7 @@ import me.ash.reader.ui.component.base.RadioDialogOption
 import me.ash.reader.ui.component.base.Subtitle
 import me.ash.reader.ui.component.base.TextFieldDialog
 import me.ash.reader.ui.page.settings.SettingItem
+import me.ash.reader.ui.theme.ProvideUnscaledUiText
 import me.ash.reader.ui.theme.palette.onLight
 
 @Composable
@@ -112,7 +113,9 @@ fun ReadingTextPage(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TitleAndTextPreview()
+                        // Unscaled: the preview shows the reading styles, which are sized by
+                        // their own preferences. See `ProvideUnscaledUiText`.
+                        ProvideUnscaledUiText { TitleAndTextPreview() }
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                 }

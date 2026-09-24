@@ -6,7 +6,7 @@
 跟随上游时不要重读 diff。按下面的顺序做，每一步都有明确的"看什么、为什么"。
 
 - **基线**：上游合并点 `d2b979cc`
-- **本文档更新于**：2026-09-24（新增 **§9 上游友好度**、本次优化清单；§1 补挂载点；**§2.8 字体设置的两层结构**与 §9.6 的落盘教训；**§9.3 平板缩放与字体收尾**、§2.2/§2.3 的缩放倍率与恒等约束、§9.6 行尾结论按平台更正）
+- **本文档更新于**：2026-09-24（新增 **§9 上游友好度**、本次优化清单；§1 补挂载点；**§2.8 字体设置的两层结构**与 §9.6 的落盘教训；**§9.3 平板缩放与字体收尾**、§2.2/§2.3 的缩放倍率与恒等约束、§9.6 行尾结论按平台更正；**§9.8 触控目标与列表内边距**；**§9.9 界面字号（设置页 + 对话框）**，含 §2.2 的 `LocalDensity` 不能跨对话框这一条）
 
 ---
 
@@ -36,16 +36,23 @@
 | 两页**各自**的自定义 TTF | `ui/ext/ListExternalFonts.kt` 的 `Slot.Feeds` / `Slot.Flow` | 不新增偏好键，复用 `ListFontsPreference.External` |
 | 平板触控目标 | `ui/adaptive/AdaptiveSizing.kt` 的 `Modifier.adaptiveIconButtonContainer()` + 2 个调用点 | **手机档一个尺寸都不传**；传了会把 48dp 压小，见 §2.2 / §9.8 |
 | 列表行高与内边距 | `GroupItem.kt`(5) / `FeedItem.kt`(4) / `ArticleItem.kt`(10) 处内边距，各包一层 `adaptiveSize()` | 其中 `ArticleItem` 的 `start = 30.dp` 是给 `FeedIcon` 预留的缩进，属**正确性**而非美观，见 §9.8 |
+| 界面字号（设置页） | `ui/page/nav3/SettingsNavEntry.kt` 的 `settingsNavEntry()` + `AppEntry.kt` 19 处调用点 | 只包设置类路由；`Feeds`/`Reading`/`Startup`/`else` 保持裸 `NavEntry`，见 §9.9 |
+| 界面字号（对话框） | `ui/component/base/RYDialog.kt` 一处 `ProvideUiTextScale { … }` | 覆盖全部 22 处对话框；另有 5 处直调 `AlertDialog` 已改走 `RYDialog(visible = true, …)`，见 §9.9 |
+| 界面字号的缩放算术 | `ui/theme/UiTextScale.kt` 的 `scaledTypography()` / `uiTextScaleSp()` | **100% 恒等**（返回同一个 `Typography` 实例）；`Typography.copy` 的 30 槽位必须显式传，见 §2.2 / §9.9 |
+| 界面字号偏好 | `infrastructure/preference/UiTextScalePreference.kt` | 范围 **100–150**，默认 100。注册点同 §2.6 |
+| 绕过 typography 的硬编码 sp | `SettingItem.kt` / `SelectableSettingGroupItem.kt` / `Banner.kt` 各 1 处 `.copy(fontSize = 20.sp)` → `uiTextScaleSp(20.sp)` | 这三处**不读** typography 槽位，重建 typography 覆盖不到，见 §9.9 |
 
 **新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass,AdaptiveSizing}.kt`、
 `ui/component/ListFonts.kt`、`ui/ext/ListExternalFonts.kt`、
+`ui/theme/UiTextScale.kt`、`ui/page/nav3/SettingsNavEntry.kt`、
 `infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
 `ListFontsPreference.kt`、`MarkAsReadButtonPositionPreference.kt`、
 `MarkAllAsReadWithoutConfirmPreference.kt`、`TitleFontsPreference.kt`、
 `{Flow,Reading}TitleFontsPreference.kt`、`ReadingAutoFullContentPreference.kt`、
+`UiTextScalePreference.kt`、
 `app/src/main/baseline-prof.txt`、四个 workflow、
-5 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
-`AdaptiveScaleTest`、`OkHttpClientModuleTest`）。
+6 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
+`AdaptiveScaleTest`、`OkHttpClientModuleTest`、`UiTextScaleTest`）。
 
 ---
 
@@ -88,6 +95,34 @@
       40dp × 1.15 = 46dp 仍然小于 48dp。
       Material 自己的 KDoc 就写着这条约束（"it must come before any size modifiers on the element that
       might limit its constraints"）。**这是"改进"最容易变成退步的一处。**
+- [ ] **`LocalDensity` 跨不过对话框边界，`LocalTypography` 可以。** 这是选「重建 typography」而不是
+      「改 `LocalDensity.fontScale`」的**唯一原因**，也是最容易在重构中被"优化"掉的一条。
+      `DialogLayout` 是个带 parent composition context 的 `AbstractComposeView`，它在自己的
+      `ProvideAndroidCompositionLocals` 里**重新提供** `LocalDensity` / `LocalContext` /
+      `LocalConfiguration`（值取自 dialog 自己的 window）→ 任何从外层传进来的 `fontScale`
+      进不了对话框。而 `LocalTypography` **不在被重提供之列**；M3 的 `AlertDialog` 又用
+      `ProvideContentColorTextStyle` 把 title / text 槽位接到 `typography.headlineSmall` / `bodyMedium`，
+      所以对话框内的 `Text` 会跟随我们重建的 typography。
+      → 报警器：**没有**。若哪天有人把 `ProvideUiTextScale` 的实现换成改 `LocalDensity`，
+      编译通过、设置页正常、**对话框静默不跟随**。真机看一眼「关于」对话框就能发现。
+- [ ] **`Typography.copy` 省略的槽位从 M3 默认值填充，不是从接收者。** 所以 `scaledTypography()`
+      必须**显式列出全部 30 个槽位**（含 `*Emphasized` 那 8 个）。漏一个，那个槽位会**回落到 M3 默认值**，
+      而不是保持上游/主题里覆写的值 —— 表现为"某个字号突然变小"，且只在非 100% 时出现。
+      `ui/theme/Type.kt` 的 `applyFontFamily` 是同一份 30 槽位清单，**两处必须同步改**。
+      → 报警器：`UiTextScaleTest` 里那条 `the emphasized slots grow too, so a dropped line cannot hide
+      behind the plain ones`（专门钉 `*Emphasized`，因为最容易漏）。
+- [ ] **`ProvideUiTextScale` 必须是幂等的（重算，不是相乘）。** 设置页路由与对话框是两个会**重叠**的
+      作用域（对话框挂在某个设置页上）。实现靠私有的 `LocalUnscaledTypography`
+      （`staticCompositionLocalOf<Typography?> { null }`）捕获**未缩放**的 typography，
+      嵌套时从捕获值重建而非在上一次结果上再乘一遍。
+      → 别用「标记位」实现幂等：对话框是独立 window，标记位在它里面不可见。
+- [ ] **列表页 / 阅读页必须保持不缩放。** `ArticleItem` / `FeedItem` 的文字是
+      `MaterialTheme.typography.<slot>.withFlowListStyle()`，而 `withListStyle` 读的就是 `fontSize` /
+      `lineHeight` 再按 `sizeSp / baselineSp` 缩放。全局换 typography 会让列表字号**乘两遍**
+      （一遍来自 typography，一遍来自列表偏好）。
+      → 所以作用域**刻意**限定在 19 条设置路由 + `RYDialog`，不是包 `MaterialTheme`。
+      同理 `ui/page/settings/color/{feeds,flow,reading}` 里 4 个预览调用点包了 `ProvideUnscaledUiText { … }`，
+      否则预览会撒谎（预览里的列表/阅读样式本就不跟随界面字号）。
 
 ### 2.3 限宽的行为边界
 
@@ -156,10 +191,14 @@ navigationIcon = {
 
 ---
 
-### 2.6 新增一个设置项要改的 5 个地方（漏一个就静默失效）
+### 2.6 新增一个设置项要改的 5 个文件（实际 6 处位置；漏一个就静默失效）
 
-加一个偏好（布尔 / 整数）**必须**同时改下面 5 处。少任何一处，要么编译不过，要么"设置能点、
+加一个偏好（布尔 / 整数）**必须**同时改下面 5 个文件。少任何一处，要么编译不过，要么"设置能点、
 但怎么点都不生效"，而且**没有任何报错**。
+
+> **数清楚：第 2 行的 `DataStoreExt.kt` 一个文件里有 4 处要改**，所以物理位置是 **6 处**
+> （字符串常量 ×2 + `PreferencesKey.keyList` ×1 + `DataStoreKey.keys` ×1 + 其余 4 个文件各 1 处）。
+> 2026-09-24 的界面字号就是这么数的 —— 只按"5 个文件"去核对，会漏掉那 4 处里的 3 处。
 
 | # | 文件 | 改什么 | 漏掉的后果 |
 |---|---|---|---|
@@ -284,6 +323,15 @@ navigationIcon = {
 - [ ] **拖动窗口跨断点**：无跳变、无崩溃
 - [ ] **列表字号** 10 / 16 / 32sp：单调变化；16sp 时与上游外观一致
 - [ ] **列表字体**：External 与阅读页一致；Default 无变化
+- [ ] **界面字号 = 100%（默认）**：设置页与对话框与改动前**逐像素一致**（`scaledTypography` 返回同一实例，见 §2.3 同款约束）
+- [ ] **界面字号 = 150%**：**逐个**设置子页无文字裁切 / 无重叠；标题与说明都变大；那 3 处硬编码 sp
+      （`SettingItem` / `SelectableSettingGroupItem` / `Banner`）跟着变大
+- [ ] **界面字号 = 150% 下的对话框（关键）**：随便开一个对话框（如「关于」或分组配置）确认标题与正文都变大。
+      **对话框不跟随 = `LocalDensity` 方案被误用的信号**，见 §2.2
+- [ ] **界面字号 = 150% 时列表页不受影响（关键）**：Feeds / Flow 的列表字号应与 100% 时**完全相同**。
+      若变大，说明缩放作用域泄漏出了设置页，列表字号乘了两遍，见 §2.2
+- [ ] **拖滑块**：读数实时变化；拖动中上方控件不"从手指下滑走"（偏好只在松手时落盘）
+- [ ] **切出去再进来**：字号保持
 - [ ] **无障碍：系统字体 200%** —— 确认文本不被裁切（旧版曾覆写 `LocalDensity`，已移除；这是回归验证）
 - [ ] **外接鼠标**：列表项、图标按钮悬停有反馈
 - [ ] 深色 / AMOLED 主题、阿拉伯语（RTL）：内边距方向正确
@@ -305,6 +353,11 @@ navigationIcon = {
    过渡时宽度会插值。这是上游共享元素设计的既有行为，本改动没有改变它。
 5. **`DataStoreExt.kt` 里 4 个偏好键共 24 行样板**，上游每加一个偏好都会在同一区域产生相邻冲突。
    合并为 2 个键可让冲突面减半，代价是老用户偏好需要迁移；**有真实用户前不要动**。
+6. **「界面字号」刻意不覆盖列表页与阅读页**（`Feeds` / `Reading` / `Startup` 三条路由保持裸 `NavEntry`）。
+   那两处的字号已各有自己的偏好（列表字号 / 阅读字号），全局再乘一遍会**乘两遍**，
+   而且会让"我设了 150% 但列表没变"看起来像 bug。**这是设计，不是遗漏** —— 详见 §2.2 / §9.9。
+7. **「界面字号」不作用于 `StartupPage` 与 `else` 兜底路由**。启动页是一次性过渡页，
+   改动它收益为零、却要多一处挂载点。
 
 ---
 
@@ -755,3 +808,59 @@ git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
 `Fork Auto Release` 至少是成功的 —— 它依赖 `assembleGithubRelease`，即**编译通过**已间接成立。
 但 `Build Commit` / `Unit Tests` 两个 job 的结论**没取到**：GitHub API 匿名配额用尽（`403 rate limit`），
 `/actions` 页面被安全策略拦截（`SENSITIVE_CONTENT_UNAVAILABLE`）。下次 push 后一并补读。
+
+---
+
+### 9.9 界面字号：设置页与对话框（2026-09-24，第三轮）
+
+用户对上一轮列出的第三项（「设置页与对话框字号」）拍板三件事：**所有对话框**都要跟随、
+默认值 **100%（与上游一致）**、控件用 **百分比滑块**。
+
+| 项 | 落点 | 上游友好度 |
+|---|---|---|
+| 缩放算术 | 新文件 `ui/theme/UiTextScale.kt`：`scaledTypography()` / `uiTextScaleSp()` / `uiTextScaleFactor()` / `ProvideUiTextScale` / `ProvideUnscaledUiText` | 高：整层是新增文件 |
+| 设置页挂载 | 新文件 `ui/page/nav3/SettingsNavEntry.kt` 的 `settingsNavEntry()`；`AppEntry.kt` **19 处** `NavEntry(key)` → `settingsNavEntry(key)` | 高：一处一词替换，无缩进重排 |
+| 对话框挂载 | `RYDialog.kt` 一处 `if (visible) { ProvideUiTextScale { AlertDialog(...) } }` | 高：22 处对话框的**唯一**注入点 |
+| 5 处直调 `AlertDialog` | `TextFieldDialog.kt`(第 3 个重载) / `SubscribeDialog.kt` / `GroupConfigurationDialogs.kt`(3) → 改走 `RYDialog(visible = true, …)` | 中：三者的参数都是 `RYDialog` 的子集，替换后删掉 `AlertDialog` import |
+| 绕过 typography 的 3 处硬编码 sp | `SettingItem.kt` / `SelectableSettingGroupItem.kt` / `Banner.kt`：`.copy(fontSize = 20.sp)` → `.copy(fontSize = uiTextScaleSp(20.sp))` | 高：单参数替换 |
+| 设置项本体 | `ColorAndStylePage.kt` 新增 `UiTextScaleItem()`（「外观」分区 `basic_fonts` 之后） | 高：新增一个私有 `@Composable` + 1 行调用 |
+| 偏好注册 | 6 处（见 §2.6）：`UiTextScalePreference.kt` / `DataStoreExt.kt` ×4 / `Settings.kt` / `Preference.kt` / `SettingsProvider.kt` | — |
+
+**为什么作用域是「19 条设置路由 + `RYDialog`」而不是包住 `MaterialTheme`。**
+`ArticleItem` / `FeedItem` 的文字是 `MaterialTheme.typography.<slot>.withFlowListStyle()`，
+基数取自 typography 槽位 → 全局换 typography 会让列表字号**乘两遍**（一遍 typography、
+一遍列表偏好）。所以刻意只覆盖设置类页面与对话框，`Feeds` / `Reading` / `Startup` / `else`
+四条路由保持裸 `NavEntry`。详见 §2.2。
+
+**为什么包 `entryProvider` 或 `NavDisplay` 都不行。**
+`NavEntry` 是 **class**（不是函数），签名
+`NavEntry(key, contentKey = …, metadata = …, content: @Composable (T) -> Unit)`；
+`entryProvider` 的 lambda 只是**捕获**了 content，真正执行它的是 `NavDisplay` 自己的 composition。
+composition local 在**运行处**解析，因此作用域必须按路由给（`settingsNavEntry`），
+在外面包一层是无效的 —— 这处很容易想当然。
+
+**滑块为什么只在 `onValueChangeFinished` 写偏好，不在每帧写。**
+该页面本身正被这个设置改变大小 —— 拖动中若即时落盘，上方所有行会跟着重排，
+控件会从手指下滑走。所以 `onValueChange` 只更新本地 `value` 用于显示读数，
+`onValueChangeFinished` 才 `UiTextScalePreference.put(...)`。
+
+**范围为什么从 100 起、不向下。** 这个功能的命题是「大屏上界面太小」，不是「比原生更小」。
+`min = 100` / `max = 150` / `default = 100`。默认值 = 100 且 `scale == 1f` 时
+`scaledTypography()` 直接 `return base`（**同一个实例**，连 `copy` 都不做），
+所以手机端与上游逐像素一致 —— 与缩放层 `Compact` 恒等是同一个约束，见 §2.3。
+
+**离线核验（push 前，本机无 JDK）**：22 个 Kotlin 文件括号平衡全过；import 可达性 10 个 watched 符号全过；
+`strings.xml` 三个 locale（`ui_text_scale` / `ui_text_scale_desc`）XML 良构且键存在；
+关键声明断言（`ProvideUiTextScale` / `settingsNavEntry` / `uiTextScaleSp` / `scaledTypography` /
+`uiTextScaleFactor` / `LocalUiTextScale` / `coerceToRange`）全过；
+偏好注册 6 处逐点计数正确（`const val uiTextScale` 恰好 2 处、其余各 1 处）；
+`AppEntry.kt` 计数 19 处 `settingsNavEntry(key)` + 4 处裸 `NavEntry`（另 1 处是注释）；
+5 处 `RYDialog(visible = true,` 且无残留直接 `AlertDialog(` 调用。
+方法与脚本见技能 `android-edit-verify-offline`。
+
+**本轮修掉的两个校验脚本缺陷**（假阳性会掩盖真问题，所以一并修）：
+1. `cmd_imports` 原来在**原文**里找符号使用 → KDoc 散文与 KDoc 链接里的符号名被当成真实使用，
+   一次报了 5 个 `FAIL` 全是假阳性。改为先 `strip_kotlin(src)` 再匹配。
+2. `declared` 原来只认 `class|object|interface|fun|val|var` 后的裸标识符 → 扩展函数
+   `fun Int.coerceToRange()` 被捕获成 `Int`，导致该符号被判为"未声明"。补上扩展函数模式
+   `\bfun\s+[\w.<>?, ]*\.\s*(\w+)\s*\(`。

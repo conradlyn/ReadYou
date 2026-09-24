@@ -3,7 +3,6 @@ package me.ash.reader.ui.component.base
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -176,7 +175,9 @@ fun TextFieldDialog(
 ) {
     val focusManager = LocalFocusManager.current
 
-    AlertDialog(
+    RYDialog(
+        // Always visible: this overload is shown by composition rather than by a flag.
+        visible = true,
         modifier = modifier,
         properties = properties,
         onDismissRequest = onDismissRequest,

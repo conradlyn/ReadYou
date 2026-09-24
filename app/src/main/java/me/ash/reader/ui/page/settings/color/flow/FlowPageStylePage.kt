@@ -26,6 +26,7 @@ import me.ash.reader.ui.ext.ListExternalFonts
 import me.ash.reader.ui.ext.MimeType
 import me.ash.reader.ui.ext.showToast
 import me.ash.reader.ui.page.settings.SettingItem
+import me.ash.reader.ui.theme.ProvideUnscaledUiText
 import me.ash.reader.ui.theme.palette.onLight
 
 @Composable
@@ -127,17 +128,22 @@ fun FlowPageStylePage(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FlowPagePreview(
-                            topBarTonalElevation = topBarTonalElevation,
-                            articleListTonalElevation = articleListTonalElevation,
-                            filterBarStyle = filterBarStyle.value,
-                            filterBarFilled = true,
-                            filterBarPadding = filterBarPadding.dp,
-                            filterBarTonalElevation = filterBarTonalElevation.value.dp,
-                            markAsReadButtonAtBottom =
-                                markAsReadButtonPosition ==
-                                    MarkAsReadButtonPositionPreference.Bottom,
-                        )
+                        // Unscaled: a preview has to show what the list page itself will look
+                        // like, and the list styles are already sized relative to the current
+                        // typography. See `ProvideUnscaledUiText`.
+                        ProvideUnscaledUiText {
+                            FlowPagePreview(
+                                topBarTonalElevation = topBarTonalElevation,
+                                articleListTonalElevation = articleListTonalElevation,
+                                filterBarStyle = filterBarStyle.value,
+                                filterBarFilled = true,
+                                filterBarPadding = filterBarPadding.dp,
+                                filterBarTonalElevation = filterBarTonalElevation.value.dp,
+                                markAsReadButtonAtBottom =
+                                    markAsReadButtonPosition ==
+                                        MarkAsReadButtonPositionPreference.Bottom,
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                 }

@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import me.ash.reader.ui.theme.uiTextScaleSp
 
 @Composable
 fun Banner(
@@ -111,7 +112,7 @@ fun Banner(
                 Text(
                     text = title,
                     maxLines = if (desc == null) 2 else 1,
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = uiTextScaleSp(20.sp)),
                     overflow = TextOverflow.Ellipsis,
                 )
                 desc?.let {

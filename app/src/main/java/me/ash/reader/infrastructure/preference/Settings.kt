@@ -20,6 +20,7 @@ data class Settings(
     val darkTheme: DarkThemePreference = DarkThemePreference.default,
     val amoledDarkTheme: AmoledDarkThemePreference = AmoledDarkThemePreference.default,
     val basicFonts: BasicFontsPreference = BasicFontsPreference.default,
+    val uiTextScale: Int = UiTextScalePreference.default,
 
     // Feeds page
     val feedsFilterBarStyle: FeedsFilterBarStylePreference = FeedsFilterBarStylePreference.default,

@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.OpenInBrowser
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import me.ash.reader.R
+import me.ash.reader.ui.component.base.RYDialog
 import me.ash.reader.ui.ext.collectAsStateValue
 import me.ash.reader.ui.interaction.alphaIndicationSelectable
 
@@ -75,7 +75,9 @@ fun AllAllowNotificationDialog(
     if (groupOptionUiState.allAllowNotificationDialogVisible) {
         var enabled by remember { mutableStateOf(true) }
 
-        AlertDialog(
+        RYDialog(
+            // Always visible: the `if` above is the visibility condition.
+            visible = true,
             onDismissRequest = { groupOptionViewModel.hideAllAllowNotificationDialog() },
             confirmButton = {
                 ApplyButton(
@@ -132,7 +134,9 @@ fun AllOpenInBrowserDialog(
     if (groupOptionUiState.allOpenInBrowserDialogVisible) {
         var enabled by remember { mutableStateOf(true) }
 
-        AlertDialog(
+        RYDialog(
+            // Always visible: the `if` above is the visibility condition.
+            visible = true,
             onDismissRequest = { groupOptionViewModel.hideAllOpenInBrowserDialog() },
             confirmButton = {
                 ApplyButton(
@@ -189,7 +193,9 @@ fun AllParseFullContentDialog(
     if (groupOptionUiState.allParseFullContentDialogVisible) {
         var enabled by remember { mutableStateOf(true) }
 
-        AlertDialog(
+        RYDialog(
+            // Always visible: the `if` above is the visibility condition.
+            visible = true,
             onDismissRequest = { groupOptionViewModel.hideAllParseFullContentDialog() },
             confirmButton = {
                 ApplyButton(

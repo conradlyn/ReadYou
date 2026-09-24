@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +52,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+import kotlin.math.roundToInt
 import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.BasicFontsPreference
 import me.ash.reader.infrastructure.preference.CustomPrimaryColorPreference
@@ -57,7 +62,10 @@ import me.ash.reader.infrastructure.preference.LocalBasicFonts
 import me.ash.reader.infrastructure.preference.LocalCustomPrimaryColor
 import me.ash.reader.infrastructure.preference.LocalDarkTheme
 import me.ash.reader.infrastructure.preference.LocalThemeIndex
+import me.ash.reader.infrastructure.preference.LocalUiTextScale
 import me.ash.reader.infrastructure.preference.ThemeIndexPreference
+import me.ash.reader.infrastructure.preference.UiTextScalePreference
+import me.ash.reader.infrastructure.preference.UiTextScalePreference.coerceToRange
 import me.ash.reader.infrastructure.preference.not
 import me.ash.reader.ui.component.base.BlockRadioButton
 import me.ash.reader.ui.component.base.BlockRadioGroupButtonItem
@@ -83,6 +91,7 @@ import me.ash.reader.ui.theme.palette.dynamic.extractTonalPalettesFromUserWallpa
 import me.ash.reader.ui.theme.palette.onDark
 import me.ash.reader.ui.theme.palette.onLight
 import me.ash.reader.ui.theme.palette.safeHexToColor
+import me.ash.reader.ui.theme.uiTextScaleSp
 
 @Composable
 fun ColorAndStylePage(
@@ -208,6 +217,7 @@ fun ColorAndStylePage(
                         desc = fonts.toDesc(context),
                         onClick = { fontsDialogVisible = true },
                     ) {}
+                    UiTextScaleItem()
                     Spacer(modifier = Modifier.height(24.dp))
                 }
                 item {
@@ -254,6 +264,54 @@ fun ColorAndStylePage(
         }
     ) {
         fontsDialogVisible = false
+    }
+}
+
+/**
+ * The interface text size row.
+ *
+ * A slider rather than the value-plus-dialog pattern the three font-size rows use, because this
+ * value is a percentage of an existing hierarchy rather than a size in `sp`: the settings page
+ * spans 14sp to 36sp, so there is no single size a number could honestly name.
+ *
+ * The preference is written on `onValueChangeFinished`, never on every frame. This page is itself
+ * drawn at the size being changed, so applying it mid-drag would reflow the rows above and slide
+ * the control out from under the finger. The readout still updates live.
+ */
+@Composable
+private fun UiTextScaleItem() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val stored = LocalUiTextScale.current
+    var value by remember(stored) { mutableStateOf(stored) }
+
+    Column(modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                modifier = Modifier.weight(1f),
+                text = stringResource(R.string.ui_text_scale),
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = uiTextScaleSp(20.sp)),
+            )
+            Text(
+                text = "$value%",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = stringResource(R.string.ui_text_scale_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { value = it.roundToInt() },
+            onValueChangeFinished = {
+                UiTextScalePreference.put(context, scope, value.coerceToRange())
+            },
+            valueRange = UiTextScalePreference.min.toFloat()..UiTextScalePreference.max.toFloat(),
+            steps = UiTextScalePreference.max - UiTextScalePreference.min - 1,
+        )
     }
 }
 

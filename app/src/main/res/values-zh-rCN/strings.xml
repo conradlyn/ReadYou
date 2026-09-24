@@ -361,4 +361,6 @@
     <string name="import_font">导入字体</string>
     <string name="imported">已导入</string>
     <string name="not_imported">尚未导入</string>
+    <string name="ui_text_scale">界面字号</string>
+    <string name="ui_text_scale_desc">设置页与对话框</string>
 </resources>

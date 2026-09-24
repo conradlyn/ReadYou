@@ -24,12 +24,22 @@ import androidx.compose.ui.unit.dp
  * - **Text.** The user has explicit, visible controls for that (`FeedsTextFontSizePreference` /
  *   `FlowTextFontSizePreference` / `ReadingTextFontSizePreference`). An implicit global multiplier
  *   on top of them would make the number in the settings page a lie - which is the mistake this
- *   layer already made once and reverted (see `AdaptiveLayout.kt`).
- * - **Touch targets.** `IconButton`'s 40dp container and the platform's 48dp minimum stay put. A
- *   bigger glyph inside the same target is a visual change; a bigger target is a hit-testing change,
- *   and that is a separate decision.
+ *   layer already made once and reverted (see `AdaptiveLayout.kt`). The interface's *own* text is a
+ *   separate and equally explicit control: `UiTextScalePreference` via `ProvideUiTextScale`.
+ *
+ * ## What this used to leave alone, and no longer does
+ *
+ * Both of the following were skipped in the first pass and picked up in the second, at the user's
+ * request. They are spelled out because "this layer does not scale X" is the kind of claim that gets
+ * believed later:
+ *
+ * - **Touch targets.** `IconButton` reserves 48dp through `minimumInteractiveComponentSize()`, and
+ *   the container is grown *on top of* that reservation, never in place of it. See
+ *   [adaptiveIconButtonContainer] for why the phone path passes no size at all.
  * - **List row heights and paddings.** Those multiply with the font-size setting, so scaling them
- *   here would silently shrink how many rows fit on screen for a user who just wanted bigger type.
+ *   does change how many rows fit on screen. That is the intended trade now, but it is also why they
+ *   are scaled at the call sites (`GroupItem` / `FeedItem` / `ArticleItem`) rather than here: the
+ *   amounts differ per row, and the icon inset in `ArticleItem` has to move together with the icon.
  *
  * ## Compact is the identity transform
  *

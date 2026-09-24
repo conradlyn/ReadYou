@@ -19,6 +19,7 @@ import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.*
 import me.ash.reader.ui.component.base.*
 import me.ash.reader.ui.page.settings.SettingItem
+import me.ash.reader.ui.theme.ProvideUnscaledUiText
 import me.ash.reader.ui.theme.palette.onLight
 
 @Composable
@@ -69,7 +70,9 @@ fun ReadingTitlePage(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TitleAndTextPreview()
+                        // Unscaled: the preview shows the reading styles, which are sized by
+                        // their own preferences. See `ProvideUnscaledUiText`.
+                        ProvideUnscaledUiText { TitleAndTextPreview() }
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                 }

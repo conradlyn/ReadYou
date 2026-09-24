@@ -79,6 +79,7 @@ class SettingsProvider @Inject constructor(
             LocalDarkTheme provides settings.darkTheme,
             LocalAmoledDarkTheme provides settings.amoledDarkTheme,
             LocalBasicFonts provides settings.basicFonts,
+            LocalUiTextScale provides settings.uiTextScale,
 
             // Feeds page
             LocalFeedsTopBarTonalElevation provides settings.feedsTopBarTonalElevation,

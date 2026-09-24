@@ -210,6 +210,9 @@ sealed interface PreferencesKey {
         // Languages
         const val languages = "languages"
 
+        // App chrome
+        const val uiTextScale = "uiTextScale"
+
         private val keyList =
             listOf(
                 // Version
@@ -293,6 +296,8 @@ sealed interface PreferencesKey {
                 IntKey(sharedContent),
                 // Languages
                 IntKey(languages),
+                // App chrome
+                IntKey(uiTextScale),
             )
 
         val keys = keyList.associateBy { it.name }
@@ -389,6 +394,9 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
 
         // Languages
         const val languages = "languages"
+
+        // App chrome
+        const val uiTextScale = "uiTextScale"
 
         val keys: MutableMap<String, DataStoreKey<*>> =
             mutableMapOf(
@@ -562,6 +570,8 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
                 sharedContent to DataStoreKey(intPreferencesKey(sharedContent), Int::class.java),
                 // Languages
                 languages to DataStoreKey(intPreferencesKey(languages), Int::class.java),
+                // App chrome
+                uiTextScale to DataStoreKey(intPreferencesKey(uiTextScale), Int::class.java),
             )
     }
 }
