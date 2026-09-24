@@ -3,7 +3,6 @@
 package me.ash.reader.ui.theme
 
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LocalTypography
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
@@ -43,19 +42,26 @@ private val LocalAppliedUiTextScale = staticCompositionLocalOf { 1f }
  * `LocalConfiguration`) from that window. A `LocalDensity` set around a page therefore stops at
  * the dialog boundary, and half of this feature is the dialogs.
  *
- * `LocalTypography` is not one of the locals that get re-provided, so it does cross into a dialog.
- * Material 3's `AlertDialog` is what makes that useful: it routes its title and text slots through
- * `ProvideContentColorTextStyle`, so a dialog's own `Text` calls do follow the typography rather
- * than falling back to an unspecified default.
+ * ## Why this goes through `MaterialTheme` instead of `LocalTypography`
+ *
+ * Overriding `LocalTypography` directly is the natural thing to reach for and is **not possible**:
+ * in material3 1.4.0 (the version this fork builds against - `compose-bom-alpha` 2025.10.01) the
+ * accessor is `internal`, so it fails with
+ * `Cannot access 'val LocalTypography': it is internal in file`.
+ *
+ * `MaterialTheme`'s `typography` parameter is the public door to the same value, and material3's
+ * own documentation recommends this shape - "separate `MaterialTheme`(s) for different screens /
+ * parts of your UI, overriding only the parts of the theme definition that need to change". See
+ * [ProvideTypography] for why every other parameter is passed explicitly.
  *
  * ## Idempotent by construction, not by a guard
  *
  * A dialog opened from a settings page is inside *two* scopes. Rather than tracking "have I
  * applied this already" with a marker, [ProvideUiTextScale] always rebuilds from the captured
- * unscaled typography ([LocalUnscaledTypography]), never from the current `LocalTypography` - so
- * nesting it recomputes the same value instead of squaring the scale. The marker approach would
- * also be wrong here, because a marker set in the page would survive into the dialog window while
- * the thing it was guarding would not.
+ * unscaled typography ([LocalUnscaledTypography]), never from the current `MaterialTheme.typography`
+ * - so nesting it recomputes the same value instead of squaring the scale. The marker approach
+ * would also be wrong here, because a marker set in the page would survive into the dialog window
+ * while the thing it was guarding would not.
  *
  * ## What is deliberately left alone
  *
@@ -70,8 +76,11 @@ fun ProvideUiTextScale(content: @Composable () -> Unit) {
     val scale = uiTextScaleFactor(LocalUiTextScale.current)
     val unscaled = LocalUnscaledTypography.current ?: MaterialTheme.typography
 
-    // Captured even when the scale is 1f, so that an outer scope cannot scale this subtree twice
-    // and so that `ProvideUnscaledUiText` deeper down has something to restore.
+    // 100% has to leave the subtree *untouched*, not merely arithmetically unchanged. Re-entering
+    // `MaterialTheme` would install a fresh ripple indication and reset `LocalTextStyle` even with
+    // the typography held constant, and a phone that never opens this setting must stay
+    // indistinguishable from upstream. `scaledTypography` returning `unscaled` itself is not
+    // enough on its own for that reason.
     if (scale == 1f) {
         CompositionLocalProvider(
             LocalUnscaledTypography provides unscaled,
@@ -84,10 +93,10 @@ fun ProvideUiTextScale(content: @Composable () -> Unit) {
     val scaled = remember(unscaled, scale) { scaledTypography(unscaled, scale) }
     CompositionLocalProvider(
         LocalUnscaledTypography provides unscaled,
-        LocalTypography provides scaled,
         LocalAppliedUiTextScale provides scale,
-        content = content,
-    )
+    ) {
+        ProvideTypography(scaled, content)
+    }
 }
 
 /**
@@ -99,20 +108,19 @@ fun ProvideUiTextScale(content: @Composable () -> Unit) {
  * the UI scale reached them, a preview would render at the interface's size rather than at the
  * size the page it previews will actually use, and the one thing a preview must not do is lie.
  *
- * A no-op when nothing has been captured, so it is safe to call from anywhere.
+ * A no-op when nothing has been captured, so it is safe to call from anywhere - and that no-op path
+ * does not even enter [ProvideTypography], which is what keeps it free outside a scaled subtree.
  */
 @Composable
 fun ProvideUnscaledUiText(content: @Composable () -> Unit) {
     val unscaled = LocalUnscaledTypography.current
     if (unscaled == null) {
         content()
-        return
+    } else {
+        CompositionLocalProvider(LocalAppliedUiTextScale provides 1f) {
+            ProvideTypography(unscaled, content)
+        }
     }
-    CompositionLocalProvider(
-        LocalTypography provides unscaled,
-        LocalAppliedUiTextScale provides 1f,
-        content = content,
-    )
 }
 
 /** Percent as stored in preferences -> the multiplier the typography is rebuilt with. */
@@ -133,6 +141,35 @@ fun uiTextScaleFactor(percent: Int): Float = percent / 100f
 fun uiTextScaleSp(value: TextUnit): TextUnit {
     val scale = LocalAppliedUiTextScale.current
     return if (scale == 1f) value else value * scale
+}
+
+/**
+ * Re-enters [MaterialTheme] with [typography] and leaves everything else as it was.
+ *
+ * Every parameter is named even though `MaterialTheme` would default them to the current values.
+ * Two reasons:
+ *
+ *  - **There are two overloads** (a 4-parameter one and a 5-parameter one that adds
+ *    `motionScheme`), and `typography` alone does not pick between them. Naming `motionScheme` -
+ *    which exists on only one of the two - is what makes the call unambiguous.
+ *  - **`motionScheme` is not cosmetic.** `AppTheme` sets `MotionScheme.expressive()`, and a silent
+ *    fall back to the standard scheme would change every animation on the settings pages while
+ *    still compiling.
+ *
+ * Re-entering the theme does have two visible-to-the-framework side effects, both checked and
+ * accepted: `LocalIndication` gets a fresh ripple instance (same configuration, so nothing renders
+ * differently) and `LocalTextStyle` becomes `typography.bodyLarge` - which is exactly what the app
+ * root already does, and is the behaviour we want here anyway.
+ */
+@Composable
+private fun ProvideTypography(typography: Typography, content: @Composable () -> Unit) {
+    MaterialTheme(
+        colorScheme = MaterialTheme.colorScheme,
+        motionScheme = MaterialTheme.motionScheme,
+        shapes = MaterialTheme.shapes,
+        typography = typography,
+        content = content,
+    )
 }
 
 /**

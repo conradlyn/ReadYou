@@ -95,16 +95,30 @@
       40dp × 1.15 = 46dp 仍然小于 48dp。
       Material 自己的 KDoc 就写着这条约束（"it must come before any size modifiers on the element that
       might limit its constraints"）。**这是"改进"最容易变成退步的一处。**
-- [ ] **`LocalDensity` 跨不过对话框边界，`LocalTypography` 可以。** 这是选「重建 typography」而不是
-      「改 `LocalDensity.fontScale`」的**唯一原因**，也是最容易在重构中被"优化"掉的一条。
-      `DialogLayout` 是个带 parent composition context 的 `AbstractComposeView`，它在自己的
-      `ProvideAndroidCompositionLocals` 里**重新提供** `LocalDensity` / `LocalContext` /
-      `LocalConfiguration`（值取自 dialog 自己的 window）→ 任何从外层传进来的 `fontScale`
-      进不了对话框。而 `LocalTypography` **不在被重提供之列**；M3 的 `AlertDialog` 又用
-      `ProvideContentColorTextStyle` 把 title / text 槽位接到 `typography.headlineSmall` / `bodyMedium`，
-      所以对话框内的 `Text` 会跟随我们重建的 typography。
-      → 报警器：**没有**。若哪天有人把 `ProvideUiTextScale` 的实现换成改 `LocalDensity`，
-      编译通过、设置页正常、**对话框静默不跟随**。真机看一眼「关于」对话框就能发现。
+- [ ] **`LocalDensity` 跨不过对话框边界；`LocalTypography` 根本不能用（它是 `internal`）。**
+      这两条合起来决定了界面字号只能走 `MaterialTheme(typography = …)`。**都实测过，不要凭直觉改。**
+      - `LocalDensity`：`DialogLayout` 是个带 parent composition context 的 `AbstractComposeView`，
+        它在自己的 `ProvideAndroidCompositionLocals` 里**重新提供** `LocalDensity` / `LocalContext` /
+        `LocalConfiguration`（值取自 dialog 自己的 window）→ 从外层传进来的 `fontScale`
+        进不了对话框。**若哪天有人把实现换成改 `LocalDensity`，会编译通过、设置页正常、对话框静默不跟随。**
+        没有报警器 —— 真机开一个「关于」对话框就能发现。
+      - `LocalTypography`：**在 material3 1.4.0 里是 `internal`**（`compose-bom-alpha` 2025.10.01）。
+        直接 `import androidx.compose.material3.LocalTypography` 会编译失败：
+        `Cannot access 'val LocalTypography: ProvidableCompositionLocal<Typography>': it is internal in file`。
+        公开入口只有 `MaterialTheme(typography = …)`。
+      - **1.4.0 里没有 `MaterialTheme.Values` / `MaterialTheme.LocalMaterialTheme`** ——
+        那是 1.5 的重构（主题合并成一个 `_localMaterialTheme`）。在网上读到的 `MaterialTheme` 源码
+        若是 `androidx-main` 分支，**签名与 1.4.0 不一致**，别照抄。
+      - **`MaterialTheme` 在 1.4.0 有两个重载**（4 参与 5 参，后者多一个 `motionScheme`）。
+        `MaterialTheme(typography = x)` 对两个都成立，所以 `ui/theme/UiTextScale.kt` 的 `ProvideTypography`
+        **显式传 `motionScheme`**：既消歧义，又保住 `AppTheme` 设的 `MotionScheme.expressive()`
+        （回落成标准动效方案会编译通过、静默改变所有设置页动画）。
+      - 核对方法（本机无 JDK 也能做）：`https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/<ver>/material3-android-<ver>.aar`
+        → 里面的 `classes.jar` → 用 Python 的 `zipfile` + 正则扫 `MaterialThemeKt.class` 常量池里的方法描述符。
+        **比读网页源码可靠。**
+      - 副作用（已核对、接受）：重入 `MaterialTheme` 会新建 ripple 实例（配置相同，渲染无差异）
+        并把 `LocalTextStyle` 设为 `typography.bodyLarge` —— 与应用根节点的既有行为一致。
+        **因此 100% 那一档必须整段跳过 `ProvideTypography`**（见下一条），否则手机会白白多一层主题。
 - [ ] **`Typography.copy` 省略的槽位从 M3 默认值填充，不是从接收者。** 所以 `scaledTypography()`
       必须**显式列出全部 30 个槽位**（含 `*Emphasized` 那 8 个）。漏一个，那个槽位会**回落到 M3 默认值**，
       而不是保持上游/主题里覆写的值 —— 表现为"某个字号突然变小"，且只在非 100% 时出现。
@@ -864,3 +878,39 @@ composition local 在**运行处**解析，因此作用域必须按路由给（`
 2. `declared` 原来只认 `class|object|interface|fun|val|var` 后的裸标识符 → 扩展函数
    `fun Int.coerceToRange()` 被捕获成 `Int`，导致该符号被判为"未声明"。补上扩展函数模式
    `\bfun\s+[\w.<>?, ]*\.\s*(\w+)\s*\(`。
+
+#### 9.9.1 第一次 push 全红：`LocalTypography` 是 `internal`（教训）
+
+`1102d33e` 三个 job 全失败。根因只有一条，在 `UiTextScale.kt`：
+
+```
+e: .../ui/theme/UiTextScale.kt:6:35  Cannot access 'val LocalTypography: ProvidableCompositionLocal<Typography>': it is internal in file
+e: .../ui/theme/UiTextScale.kt:87:9   (同上)
+e: .../ui/theme/UiTextScale.kt:112:9  (同上)
+```
+
+**我此前的判断是错的**：我以为 `LocalTypography` 是公开 API（在线读到的 material3 源码确实把它写成
+`public`），并据此论证"`LocalTypography` 能跨对话框，所以选重建 typography"。实际编译的是
+**material3 1.4.0**，那里它是 `internal`。修法是改用公开入口 `MaterialTheme(typography = …)`，
+见 §2.2 的核验项。
+
+**为什么这次能拿到错误原文**（本机无 JDK、日志接口要管理员权限，这两个限制一直没变）：
+给 `fork-unit-tests.yaml` 的 `Unit tests` 步骤临时加了 `2>&1 | tee` + 把匹配行
+`echo "::error::$line"`，**注解在运行页面对匿名读者可见**，于是不用 API 配额也读得到。
+拿到后该临时步骤已移除。
+
+**顺带得到的一条通用手段**（比读网页源码可靠）：确认某个 AndroidX API 在当前版本里到底长什么样，
+直接下载对应版本的 AAR，解 `classes.jar`，用 Python 扫 `*.class` 常量池里的方法描述符：
+
+```python
+import zipfile, io, re
+aar = zipfile.ZipFile('material3-android-1.4.0.aar')
+cj = zipfile.ZipFile(io.BytesIO(aar.read('classes.jar')))
+raw = cj.read('androidx/compose/material3/MaterialThemeKt.class')
+print(sorted({s.decode() for s in re.findall(rb'\(Landroidx/compose/material3/[^)]*\)V', raw)}))
+```
+
+AAR 地址：`https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/<ver>/material3-android-<ver>.aar`。
+用这个方法一次问清了四件事：`LocalTypography` 存在但不可见、**没有** `MaterialTheme.Values` /
+`LocalMaterialTheme`（那是 1.5 的）、`MaterialTheme` 有 4 参和 5 参**两个重载**、
+`MaterialTheme.motionScheme` 访问器是公开的。
