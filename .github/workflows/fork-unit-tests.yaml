@@ -46,8 +46,25 @@ jobs:
 
       # The same task upstream's testing.yml runs, so green here means the same thing as a green
       # "Run Unit Tests" check on a pull request.
+      #
+      # TEMPORARY (remove once the interface-text-size round is green): the development machine has
+      # no JDK and the log-download API needs admin rights, so a Kotlin error would otherwise be
+      # invisible from here. The compiler output is echoed back as annotations, which the run page
+      # renders for anonymous readers. The `tee`/`PIPESTATUS` shape is what keeps the step's exit
+      # status equal to Gradle's rather than to `tee`'s.
       - name: Unit tests
-        run: ./gradlew testGithubReleaseUnitTest --max-workers=2
+        shell: bash
+        run: |
+          set +e
+          ./gradlew testGithubReleaseUnitTest --max-workers=2 2>&1 | tee /tmp/gradle.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "gradle exit status: $status"
+            grep -nE '(^| )e: |error:|What went wrong|Execution failed|> Task .*FAILED|Caused by|AAPT' /tmp/gradle.log \
+              | head -60 \
+              | while IFS= read -r line; do echo "::error::$line"; done
+            exit "$status"
+          fi
 
       # A skipped test still leaves the job green. ListFontBaselineTest skips itself with Assume when
       # the Compose typography classes cannot be loaded on a plain JVM, and for that one test a skip
