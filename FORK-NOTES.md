@@ -187,6 +187,17 @@ navigationIcon = {
 条件条（`MarkAsReadBar`）从 content 顶部移到了 `bottomBar` 的 `Column` 里、`FilterBar` **之上**。
 注意 Scaffold 的 `bottomBar` 槽位**不是浮层**：展开时它会把内容区**推高**，而不是盖在列表上。
 
+**设置项的位置（2026-09-24 调整过，别改回去）**：`markAsReadButtonPosition` 与
+`markAllAsReadWithoutConfirm` 这两行**必须相邻**，都放在 `FlowPageStylePage` 的「顶部栏」
+分区里。原来 `markAllAsReadWithoutConfirm` 被落在「筛选栏」分区的**最后一行**，
+与它的姊妹设置相隔约 140 行 —— 用户根本找不到（有人直接来提"请加这个设置"，
+而功能其实早就有了）。两行都只配置**同一个按钮**，拆开就没有可发现性。
+
+**没有做、但值得知道的取舍**：`markAllAsReadWithoutConfirm` 打开后走的是
+`MarkAsReadConditions.All`，且条件条永远不会展开 → **7 天 / 3 天 / 1 天这三个选项变得不可达**。
+目前是二元开关（要确认 / 不要确认），不是三态。若将来有人想要"不确认但要按 3 天"，需要把它
+改成三态偏好，别在 `onMarkAsReadClick` 里堆 `if`。
+
 ---
 
 ## 3. 真机核验清单

@@ -147,6 +147,16 @@ fun FlowPageStylePage(
                         desc = markAsReadButtonPosition.description,
                         onClick = { showMarkAsReadButtonPositionDialog = true },
                     ) {}
+                    // Sits next to the row above on purpose: both configure the same button, and
+                    // keeping them apart meant the no-confirm switch was effectively unfindable.
+                    SettingItem(
+                        title = stringResource(R.string.mark_all_as_read_without_confirm),
+                        onClick = { (!markAllAsReadWithoutConfirm).put(context, scope) },
+                    ) {
+                        RYSwitch(activated = markAllAsReadWithoutConfirm.value) {
+                            (!markAllAsReadWithoutConfirm).put(context, scope)
+                        }
+                    }
                     SettingItem(
                         title = stringResource(R.string.tonal_elevation),
                         desc = "${topBarTonalElevation.value}dp",
@@ -284,14 +294,6 @@ fun FlowPageStylePage(
                             filterBarTonalElevationDialogVisible = true
                         },
                     ) {}
-                    SettingItem(
-                        title = stringResource(R.string.mark_all_as_read_without_confirm),
-                        onClick = { (!markAllAsReadWithoutConfirm).put(context, scope) },
-                    ) {
-                        RYSwitch(activated = markAllAsReadWithoutConfirm.value) {
-                            (!markAllAsReadWithoutConfirm).put(context, scope)
-                        }
-                    }
                 }
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
