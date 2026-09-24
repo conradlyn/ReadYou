@@ -100,5 +100,6 @@ out/
 
 ### Agent workspace ###
 .workbuddy/
+.workbuddy-ai/
 
 signature
