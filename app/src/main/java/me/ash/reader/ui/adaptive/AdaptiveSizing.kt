@@ -1,7 +1,10 @@
 package me.ash.reader.ui.adaptive
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 /**
  * Scales one dimension for the current window size class.
@@ -59,3 +62,34 @@ fun scaledDp(base: Dp, scale: Float): Dp = if (scale == 1f) base else base * sca
  */
 @Composable
 fun adaptiveScale(): Float = LocalAdaptiveLayout.current.scale
+
+/**
+ * Grows an `IconButton`'s container on tablet widths, and leaves the modifier untouched on a phone.
+ *
+ * ## Why "untouched on a phone" is the point, not a micro-optimisation
+ *
+ * `IconButton` builds its box as `modifier.minimumInteractiveComponentSize().size(40.dp)`, and
+ * Material's own KDoc for `minimumInteractiveComponentSize` warns that *"for this modifier to take
+ * effect, it must come before any size modifiers on the element that might limit its constraints"*.
+ * A `Modifier.size` handed in here lands **before** it, so on a phone it would cap the 48dp that
+ * `IconButton` reserves: the touch target would silently drop from 48dp to whatever we passed. That
+ * is a regression dressed up as an improvement, so on a phone nothing is passed at all.
+ *
+ * (Verified against the material3 1.4.0 sources rather than assumed: `SmallIconButtonTokens`
+ * `ContainerHeight` is 40dp and `IconButtonDefaults.smallContainerSize()` resolves to the same 40dp,
+ * while `InteractiveComponentSize` reserves 48dp. The chain order above is `IconButton.kt` as
+ * shipped.)
+ *
+ * ## Why the 48dp floor
+ *
+ * Once we do grow it, the floor is what keeps the reservation intact: the stock 40dp scaled by the
+ * `Medium` factor of 1.15 is only 46dp, which would still be a shrink. So the container is
+ * `max(adaptiveSize(40.dp), 48.dp)` - 48dp on `Medium`, 50dp on `Expanded`.
+ */
+@Composable
+fun Modifier.adaptiveIconButtonContainer(): Modifier {
+    val scale = adaptiveScale()
+    if (scale == 1f) return this
+    // 40dp is `SmallIconButtonTokens.ContainerHeight`, the stock container.
+    return this.size(maxOf(adaptiveSize(40.dp), 48.dp))
+}

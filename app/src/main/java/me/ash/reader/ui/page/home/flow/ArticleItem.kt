@@ -139,10 +139,10 @@ fun ArticleItem(
     Column(
         modifier =
             modifier
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = adaptiveSize(12.dp))
                 .clip(Shape20)
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .padding(horizontal = adaptiveSize(12.dp), vertical = adaptiveSize(12.dp))
                 .alpha(
                     when (articleListReadIndicator) {
                         FlowArticleReadIndicatorPreference.None -> 1f
@@ -169,8 +169,9 @@ fun ArticleItem(
                     modifier =
                         Modifier.weight(1f)
                             .padding(
-                                start = if (articleListFeedIcon.value) 30.dp else 0.dp,
-                                end = 10.dp,
+                                start =
+                                    if (articleListFeedIcon.value) adaptiveSize(30.dp) else 0.dp,
+                                end = adaptiveSize(10.dp),
                             ),
                     text = feedName,
                     color = MaterialTheme.colorScheme.tertiary,
@@ -220,11 +221,11 @@ fun ArticleItem(
         }
 
         // Bottom
-        Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(top = adaptiveSize(4.dp))) {
             // Feed icon
             if (articleListFeedIcon.value) {
                 FeedIcon(feedName = feedName, iconUrl = feedIconUrl)
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(adaptiveSize(10.dp)))
             }
 
             // Article
@@ -249,7 +250,7 @@ fun ArticleItem(
                         if (isStarred) {
                             StarredIcon()
                         } else {
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(adaptiveSize(16.dp)))
                         }
                     }
                 }
@@ -260,7 +261,7 @@ fun ArticleItem(
                         shortDescription.isNotBlank()
                 ) {
                     Text(
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = adaptiveSize(4.dp)),
                         text = shortDescription,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style =
@@ -281,7 +282,10 @@ fun ArticleItem(
             // Image
             if (imgData != null && articleListImage.value) {
                 RYAsyncImage(
-                    modifier = Modifier.padding(start = 10.dp).size(80.dp).clip(Shape20),
+                    modifier =
+                        Modifier.padding(start = adaptiveSize(10.dp))
+                            .size(adaptiveSize(80.dp))
+                            .clip(Shape20),
                     data = imgData,
                     scale = Scale.FILL,
                     precision = Precision.INEXACT,
@@ -448,7 +452,9 @@ private fun SwipeActionBox(
                                 imageVector = it,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.padding(horizontal = 24.dp),
+                                modifier =
+                                    Modifier.padding(horizontal = adaptiveSize(24.dp))
+                                        .size(adaptiveSize(24.dp)),
                             )
                         }
                 },
@@ -472,7 +478,9 @@ private fun SwipeActionBox(
                                 imageVector = it,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.padding(horizontal = 24.dp),
+                                modifier =
+                                    Modifier.padding(horizontal = adaptiveSize(24.dp))
+                                        .size(adaptiveSize(24.dp)),
                             )
                         }
                 },

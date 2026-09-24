@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import kotlinx.coroutines.launch
 import me.ash.reader.domain.model.feed.Feed
+import me.ash.reader.ui.adaptive.adaptiveSize
 import me.ash.reader.ui.component.FeedIcon
 import me.ash.reader.ui.component.base.RYExtensibleVisibility
 import me.ash.reader.ui.component.withFeedsListStyle
@@ -31,8 +32,11 @@ import me.ash.reader.ui.page.home.feeds.drawer.feed.FeedOptionViewModel
 
 @Composable
 private fun contentPadding(isLastItem: Boolean): PaddingValues = if (isLastItem) PaddingValues(
-    bottom = 22.dp, start = 14.dp, end = 14.dp, top = 14.dp
-) else PaddingValues(14.dp)
+    bottom = adaptiveSize(22.dp),
+    start = adaptiveSize(14.dp),
+    end = adaptiveSize(14.dp),
+    top = adaptiveSize(14.dp),
+) else PaddingValues(adaptiveSize(14.dp))
 
 @OptIn(
     ExperimentalFoundationApi::class,
@@ -62,7 +66,7 @@ private fun FeedItemImpl(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 14.dp, end = 6.dp),
+                .padding(start = adaptiveSize(14.dp), end = adaptiveSize(6.dp)),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -71,7 +75,8 @@ private fun FeedItemImpl(
                     feedName = feed.name, iconUrl = feed.icon, modifier = Modifier
                 )
                 Text(
-                    modifier = Modifier.padding(start = 12.dp, end = 6.dp),
+                    modifier =
+                        Modifier.padding(start = adaptiveSize(12.dp), end = adaptiveSize(6.dp)),
                     text = feed.name,
                     style = MaterialTheme.typography.labelLarge.merge(
                         lineHeight = 20.sp,

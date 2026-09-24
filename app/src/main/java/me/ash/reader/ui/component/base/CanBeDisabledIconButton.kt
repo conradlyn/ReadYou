@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import me.ash.reader.ui.adaptive.adaptiveIconButtonContainer
 import me.ash.reader.ui.adaptive.adaptiveSize
 
 @Composable
@@ -28,7 +29,8 @@ fun CanBeDisabledIconButton(
     onClick: () -> Unit = {},
 ) {
     IconButton(
-        modifier = modifier,
+        // Left untouched on a phone on purpose; see `adaptiveIconButtonContainer`.
+        modifier = modifier.adaptiveIconButtonContainer(),
         enabled = !disabled,
         onClick = onClick,
         colors = IconButtonDefaults.iconButtonColors(

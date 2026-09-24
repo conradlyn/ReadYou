@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import me.ash.reader.ui.adaptive.adaptiveIconButtonContainer
 import me.ash.reader.ui.adaptive.adaptiveSize
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +60,9 @@ fun FeedbackIconButton(
         }
     ) {
         IconButton(
+            // Grows the tap target on a tablet. See `adaptiveIconButtonContainer` for why
+            // the phone path passes no size at all.
+            modifier = Modifier.adaptiveIconButtonContainer(),
             enabled = enabled,
             onClick = {
                 if (isHaptic == true) view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)

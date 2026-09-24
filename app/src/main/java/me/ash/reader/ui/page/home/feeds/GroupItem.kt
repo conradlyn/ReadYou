@@ -56,7 +56,7 @@ fun GroupItem(
                     onLongClick()
                 }
             )
-            .padding(top = 22.dp)
+            .padding(top = adaptiveSize(22.dp))
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -66,7 +66,7 @@ fun GroupItem(
             Text(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 28.dp),
+                    .padding(horizontal = adaptiveSize(28.dp)),
                 text = group.name,
                 style = MaterialTheme.typography.titleMedium.withFeedsListStyle(),
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -75,7 +75,7 @@ fun GroupItem(
             )
             Row(
                 modifier = Modifier
-                    .padding(end = 20.dp)
+                    .padding(end = adaptiveSize(20.dp))
                     // The circle and the glyph grow together. Scaling only the glyph would overflow
                     // the 24dp circle; scaling only the circle would leave the arrow looking lost.
                     .size(adaptiveSize(24.dp))
@@ -93,7 +93,7 @@ fun GroupItem(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(adaptiveSize(22.dp)))
     }
 }
 
@@ -101,8 +101,8 @@ fun GroupItem(
 inline fun GroupWithFeedsContainer(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
         modifier = modifier
-            .padding(top = 16.dp)
-            .padding(horizontal = 16.dp)
+            .padding(top = adaptiveSize(16.dp))
+            .padding(horizontal = adaptiveSize(16.dp))
             .clip(Shape32)
             .background(MaterialTheme.colorScheme.surfaceContainerLow),
         content = { content() }
