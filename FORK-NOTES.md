@@ -486,3 +486,39 @@ git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
 - **`CrashHandler` 不委托默认处理器也不结束进程**：要动崩溃路径，单独验证。
 - **`ArticleList` 里 sticky header 的 O(n) 全量遍历**：`default = OFF`，默认根本不走；
   真收到反馈应该加提示文案，而不是重写那段。
+
+### 9.5 这一版的核验结果（2026-09-24）
+
+提交：`db37b454` → `bce0ca13` → `27edf7bc` → `3d826fb6`（最后一个是纯文档）。
+
+| 项 | 结果 |
+|---|---|
+| `Build Commit`（`27edf7bc`） | success |
+| `Fork Auto Release`（`27edf7bc`） | success，发布 **`v0.16.2-tablet.8`** |
+| `Unit Tests`（`27edf7bc`） | `cancelled` —— **不是失败**，是被后推的文档提交按 `cancel-in-progress` 取消了 |
+| `Unit Tests`（`3d826fb6`） | **success**，且它就是含全部新测试的工作树 |
+| 测试报告实测 | 9 个测试类 / **30 用例，0 失败 0 错误 0 跳过** |
+| APK | `ReadYou-0.16.2-27edf7bc.apk` **11,078,008 B**（tablet.7 是 11,118,559 B，**-40,551 B**） |
+
+**两个此前存疑的点都清掉了：**
+
+1. **OkHttp `5.0.0-alpha.12` 的 `Interceptor.Chain` 接口形状**——上游 `#1322` 的测试是在上游
+   自己的依赖下写的，不保证在本仓库成立。实测 `OkHttpClientModuleTest` 3 个用例**全过**。
+2. **字体基线守卫**——`ListFontBaselineTest` 3 用例 **0 skip**（`fork-unit-tests.yaml` 里那步
+   「skip 也算失败」的守卫生效），说明 Compose BOM 的 `titleMedium` 仍是 16sp。
+
+**还没拿到的数字**：`27edf7bc` APK 内 `assets/dexopt/baseline.prof` 的字节数。
+`Build Commit` 日志显示 AGP 跑了 `:mergeGithubReleaseArtProfile` →
+`:expandGithubReleaseArtProfileWildcards` → `:compileGithubReleaseArtProfile` 且**零告警**，
+说明源集里的 `baseline-prof.txt` 被处理了；但**光有 library 自带的 profile 这些任务也会出现，
+所以这不算决定性证据**。当晚 `github.com` / `release-assets` 直连与代理两条都断，拿不到包。
+补测（网络恢复后）：
+
+```
+python ~/.workbuddy/skills/android-edit-verify-offline/scripts/peek_apk_entry.py \
+  "https://github.com/conradlyn/ReadYou/releases/download/v0.16.2-tablet.8/ReadYou-0.16.2-27edf7bc.apk" \
+  "assets/dexopt/baseline.prof" "classes.dex"
+```
+
+对照基线：`f40e6650` 的包里 `baseline.prof` = **7,224 B**、`baseline.profm` = **1,105 B**。
+（`baseline.prof` 是 zlib 压缩的，`unzip -l` 报的是压缩后大小。）
