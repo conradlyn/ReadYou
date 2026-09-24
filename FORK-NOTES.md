@@ -6,7 +6,7 @@
 跟随上游时不要重读 diff。按下面的顺序做，每一步都有明确的"看什么、为什么"。
 
 - **基线**：上游合并点 `d2b979cc`
-- **本文档更新于**：2026-09-23（发布改为 push 全自动 → §7；上游同步流程 + 别点网页 Sync fork → §8）
+- **本文档更新于**：2026-09-24（新增 **§9 上游友好度**与本次优化清单；§1 补挂载点）
 
 ---
 
@@ -24,11 +24,17 @@
 | "全部已读"按钮位置 | `FlowPage.kt` 的 `topBar.actions`（Top）/ `bottomBar`（Bottom），按钮本体共用 `MarkAsReadIconButton` | 由偏好 `markAsReadButtonPosition` 决定，**默认 Bottom** = 工具栏左侧 |
 | "全部已读"条件条 | `FlowPage.kt` 的 `bottomBar` 里的 `Column` | 从 content 顶部移到 `FilterBar` **之上**，向上展开（见 §2.7） |
 | 新增偏好 | `ui/ext/DataStoreExt.kt` + `preference/{Settings,Preference,SettingsProvider}.kt` | 加一项要同时改 5 个地方，见 §2.6 |
+| 图标解码尺寸 | `ui/component/FeedIcon.kt` 的私有常量 `FEED_ICON_DECODE_SIZE` | 不传 `size` 会落到 `RYAsyncImage` 的默认 `Size.ORIGINAL`，即按原始分辨率解码 |
+| 已读状态的重组范围 | `ui/page/home/flow/ArticleList.kt` 的 `rememberIsUnread()` | `diffMap` 是 `SnapshotStateMap`，直接读记录的是 map 级依赖；包一层 `derivedStateOf` |
+| Widget 任务入队 | `domain/service/WidgetUpdateWorker.kt` | 一次性任务改 `enqueueUniqueWork(KEEP)`；预览守卫从实例字段改成进程级标记 |
+| 抓取层（UA / 字符集） | `infrastructure/di/OkHttpClientModule.kt`、`infrastructure/rss/RssHelper.kt` | 来自上游 open PR，见 §9.2 |
 
 **新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass}.kt`、
 `ui/component/ListFonts.kt`、`infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
 `ListFontsPreference.kt`、`MarkAsReadButtonPositionPreference.kt`、
-`MarkAllAsReadWithoutConfirmPreference.kt`、四个 workflow、3 个单测。
+`MarkAllAsReadWithoutConfirmPreference.kt`、`app/src/main/baseline-prof.txt`、四个 workflow、
+4 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
+`OkHttpClientModuleTest`）。
 
 ---
 
@@ -369,8 +375,11 @@ git -c http.schannelCheckRevoke=false -c http.version=HTTP/1.1 push origin main
 
 - **上游 `ReadYouApp/ReadYou` 的 main 停在 `d2b979cc`（2026-08-11），自那以后没有任何新提交。**
   GitHub compare API 对 `d2b979cc...main` 返回 `identical`（ahead_by = 0）。
-- 也就是说 **本 fork 目前 21 ahead / 0 behind —— 现在没有任何东西需要同步**，
+- 也就是说 **本 fork 目前 28 ahead / 0 behind —— 现在没有任何东西需要同步**，
   这份流程是给上游下次发版时用的。
+- **2026-09-24 复查：结论不变**（main 仍是 `d2b979cc`，13 个上游分支无一领先 main）。
+  那次复查的重点转向了 **open PR**——主干上没有可同步的，但 31 个 open PR 里有值得主动摘的。
+  明细与冲突面分析见 `UPSTREAM-TRACKING.md`。
 - 上游的更新节奏是**低频**：2026-08-11 之后停滞；再往前是 7 月初、6 月初、5 月中各几个提交，
   其中相当一部分是 Weblate 翻译和 docs/CI 改动。所以"跟着上游跑"的成本本身就不高。
 
@@ -381,3 +390,99 @@ git -c http.schannelCheckRevoke=false -c http.version=HTTP/1.1 push origin main
 - ❌ 试图让 workflow 全自动 merge 上游 —— 冲突时它只会失败，而 §2 那份核验清单
   （字号基线、pane 内边距、顶部栏图标）**本来就必须人工过一遍**，自动合进来反而是隐患。
   可选的是"自动**检测**上游是否更新"，但合并要人来做。
+
+---
+
+## 9. 上游友好度：新改动该落在哪里（2026-09-24 定）
+
+做任何优化前先问一句：**这次改动会不会在下一次 `git merge upstream/main` 时变成额外的手工活？**
+
+### 9.1 优先级从高到低
+
+| 改动形态 | 未来的合并成本 | 例子 |
+|---|---|---|
+| **纯新增文件** | 零 | `baseline-prof.txt`、新的 Preference 文件、新的 workflow |
+| **删掉上游某个独立的行 / 块** | 低（内容减少最容易被自动合并） | 删掉重复的 `implementation(ui-tooling)`、删掉遗留的 `ProfileInstallerInitializer` 调用 |
+| **在独立位置追加一小段** | 低 | `FeedIcon.kt` 加私有常量并传参 |
+| **改上游热点文件的核心逻辑** | 高，需逐行对 | `DataStoreExt.kt` 的 keys map、`FlowPage.kt` 的布局树 |
+| **重构上游既有结构** | 最高，基本每次都要重做 | 换偏好注册机制、换 DI 结构 |
+
+⚠️ `ArticleList.kt`、`FlowPage.kt`、`FeedsPage.kt`、`ArticleItem.kt`、`DataStoreExt.kt`
+是上游的**热点文件**，能不动就不动。本次唯一新增的热点挂载点是 `ArticleList.kt`
+（`rememberIsUnread`：两处调用 + 一个私有函数）。冲突时按"保留 `derivedStateOf` 包法"手工合即可。
+
+### 9.2 摘上游 open PR 反而比自己写更"上游友好"
+
+本次最关键的一条结论。同样是修一个问题，有两条路：
+
+- **自己实现一遍** —— 上游将来合并它自己的 PR 时，两边是**不同实现**，git 只能报冲突，得手工挑拣。
+- **把那个 PR 的补丁摘过来** —— 上游将来合并的是**同样的改动**，base 相同、diff 相同，
+  git 能识别成"两边做了同一件事"从而自动合并。
+
+所以只要该 PR 碰的文件本 fork 没改过，**摘 PR 是更省事的选择**。冲突面一算就知道：
+
+```bash
+# 本 fork 改过哪些文件 —— 摘 PR 的"冲突面"基准
+git diff --name-only upstream/main HEAD
+# 某个 PR 改了哪些文件
+curl -s --ssl-no-revoke -H "Authorization: token $TOKEN" \
+  "https://api.github.com/repos/ReadYouApp/ReadYou/pulls/<N>/files?per_page=100" \
+  -o "C:/Users/lfk/AppData/Local/Temp/files<N>.json"
+# 拿 patch 并试应用（干净通过 = 可摘）
+git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
+```
+
+**摘之前必须看三样东西**（本次三样全踩到了）：
+
+1. **`commits` 列表** —— 标题常骗人。`#1305` 叫 "Fix sync worker stall"，实际是 **23 个提交的杂烩**，
+   夹带 version bump、DB schema 升到 8 和新功能，整体摘会把版本号与数据库版本一起顶掉。
+2. **新增的测试** —— `#1322` 带了两个**真实联网**测试（去请求 phoronix.com）。单测依赖外部站点
+   的可用性与反爬策略会让 CI 偶发红灯，**必须剔除**。
+3. **多个 PR 之间是否互相冲突** —— `#1322` 与 `#1323` 都从同一 base 改 `RssHelper.kt` 与
+   `RssHelperTest.kt`，**不能顺序 apply**，要手工合。
+
+### 9.3 本次（2026-09-24）落地的改动
+
+**摘上游 open PR（全部零冲突，碰的文件本 fork 从未改过）**
+
+| PR | 内容 |
+|---|---|
+| `#1322` | 浏览器风格 UA 绕过 WAF 拦爬；`BestIconFinder` 容错、无协议域名改走 https、图标候选限 4 个；`searchFeed` 的错误里带上 HTTP 状态码。**剔除了它自带的 2 个联网测试** |
+| `#1323` | 完整内容解析的正确字符集探测（HTTP header → BOM → `<meta>` → UTF-8），带 4 个本地测试 |
+| `#1324` | 超长图片文件名截断，防 `ENAMETOOLONG` |
+| `#1320` | 打开链接失败时重置 intent 的包名 |
+| `#1317` | 保存 greader / FreshRSS 服务器地址时补回结尾斜杠 |
+
+**启动与构建**
+
+- 删掉 `app/build.gradle.kts` 里重复的 `implementation(ui-tooling)`（同文件 151 行已有
+  `debugImplementation`）—— 这条让 ui-tooling 进了 release dex，已用 dex 的类型描述符表坐实。
+- 删掉 `MainActivity` 里遗留的 `ProfileInstallerInitializer().create()`（主线程磁盘 IO，release 也跑）。
+- `AndroidApp` 的 WorkManager 日志级别按 `BuildConfig.DEBUG` 分档。
+- `AndroidApp` 删掉 12 个未被引用的 `@Inject lateinit`（Hilt 会在 Application 创建时把所有字段实例化，
+  全在主线程）。**`diffMapHolder` 虽然也没被引用，但必须保留** —— 它靠注入触发 `init{}` 里的副作用。
+- `WidgetUpdateWorker` 的一次性任务改 `enqueueUniqueWork(..., KEEP)`（原来无 unique name，
+  每次 `onResume` 都堆一个）；`haveSetPreviews` 从 Worker 实例字段改成进程级 `@Volatile`
+  —— Worker 每次执行都是新实例，**原来那个守卫从未生效过**。
+
+**渲染与解码**
+
+- `ArticleList` 用 `derivedStateOf` 收敛 `diffMap` 的重组范围（见 §1 表格）。
+- `FeedIcon` 传 `size = 192px`，不再按原始分辨率解码订阅源 logo（logo 常是 512×512 或 1200×630，
+  为一个 20dp 的圆点解码约 3 MB 位图）。
+- 新增 `app/src/main/baseline-prof.txt`（启动入口 + 首屏类）。**注意**：AndroidX AAR 自带的 profile
+  早已由 AGP 合并，缺的只是应用自身的那一半。
+- `MainActivity` 的 `"${e.printStackTrace()}"` 改成把异常作为参数传入（原写法日志永远是 `kotlin.Unit`）。
+
+### 9.4 明确没做（省得将来重复考虑）
+
+- **Room 复合索引**（`article` 加 `(accountId, date)` / `(feedId, date)`）：需要 DB migration，
+  且上游 `#1305` 正在把 schema 推到 8 —— 两边会抢同一个版本号。**单独发版，且先确认上游动向。**
+- **`proguard-rules.pro` 的 `-dontobfuscate` 与 `-keep class me.ash.reader.** { *; }`**：
+  上游几乎不碰这个文件，所以"上游友好度"最高，但风险在**运行时**（Gson 反射、Rome 解析、Widget），
+  必须真机冒烟一遍。适合单独做、单独发版。
+- **`OkHttpClientModule` 的 `trustAllCerts = true`**：上游 `#1322` 重写了这个文件却**保留**了它。
+  收紧会影响自建 FreshRSS 的同步，改动面大，继续记录在案、不动。
+- **`CrashHandler` 不委托默认处理器也不结束进程**：要动崩溃路径，单独验证。
+- **`ArticleList` 里 sticky header 的 O(n) 全量遍历**：`default = OFF`，默认根本不走；
+  真收到反馈应该加提示文案，而不是重写那段。
