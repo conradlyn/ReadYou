@@ -54,7 +54,9 @@ fun TitleAndTextPreview() {
             text = if (titleUpperCase.value) titleUpperCaseString else stringResource(id = R.string.title),
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.headlineLarge.copy(
-                fontFamily = LocalReadingFonts.current.asFontFamily(context),
+                fontFamily =
+                    LocalReadingTitleFonts.current.asFontFamily(context)
+                        ?: LocalReadingFonts.current.asFontFamily(context),
                 fontWeight = if (titleBold.value) FontWeight.Bold else FontWeight.Medium,
             ),
             textAlign = titleAlign.toTextAlign(),

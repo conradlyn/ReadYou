@@ -11,6 +11,7 @@ import me.ash.reader.infrastructure.preference.LocalFeedsFonts
 import me.ash.reader.infrastructure.preference.LocalFeedsTextFontSize
 import me.ash.reader.infrastructure.preference.LocalFlowFonts
 import me.ash.reader.infrastructure.preference.LocalFlowTextFontSize
+import me.ash.reader.infrastructure.preference.LocalFlowTitleFonts
 
 /**
  * Applies the feeds page font family and font size to one of its list text styles.
@@ -32,6 +33,22 @@ fun TextStyle.withFeedsListStyle(): TextStyle =
 fun TextStyle.withFlowListStyle(): TextStyle =
     withListStyle(
         fontFamily = LocalFlowFonts.current.asFontFamily(LocalContext.current),
+        sizeSp = LocalFlowTextFontSize.current,
+        baselineSp = FlowTextFontSizePreference.baseline,
+    )
+
+/**
+ * Same as [withFlowListStyle], but for the article title.
+ *
+ * The title has a font row of its own; it falls back to the list font, so the size scaling - and
+ * with it the baseline the font-size guard watches - stays identical to every other row.
+ */
+@Composable
+fun TextStyle.withFlowTitleStyle(): TextStyle =
+    withListStyle(
+        fontFamily =
+            LocalFlowTitleFonts.current.asFontFamily(LocalContext.current)
+                ?: LocalFlowFonts.current.asFontFamily(LocalContext.current),
         sizeSp = LocalFlowTextFontSize.current,
         baselineSp = FlowTextFontSizePreference.baseline,
     )

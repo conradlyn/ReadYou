@@ -53,6 +53,7 @@ fun Preferences.toSettings(): Settings {
         flowArticleListTonalElevation = FlowArticleListTonalElevationPreference.fromPreferences(this),
         flowSortUnreadArticles = SortUnreadArticlesPreference.fromPreferences(this),
         flowFonts = FlowFontsPreference.fromPreferences(this),
+        flowTitleFonts = FlowTitleFontsPreference.fromPreferences(this),
         flowTextFontSize = FlowTextFontSizePreference.fromPreferences(this),
 
         // Reading page
@@ -70,6 +71,8 @@ fun Preferences.toSettings(): Settings {
         readingTitleAlign = ReadingTitleAlignPreference.fromPreferences(this),
         readingSubheadAlign = ReadingSubheadAlignPreference.fromPreferences(this),
         readingFonts = ReadingFontsPreference.fromPreferences(this),
+        readingTitleFonts = ReadingTitleFontsPreference.fromPreferences(this),
+        readingAutoFullContent = ReadingAutoFullContentPreference.fromPreferences(this),
         readingTitleBold = ReadingTitleBoldPreference.fromPreferences(this),
         readingSubheadBold = ReadingSubheadBoldPreference.fromPreferences(this),
         readingTitleUpperCase = ReadingTitleUpperCasePreference.fromPreferences(this),

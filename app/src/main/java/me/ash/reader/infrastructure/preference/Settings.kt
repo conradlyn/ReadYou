@@ -46,6 +46,7 @@ data class Settings(
     val flowArticleListReadIndicator: FlowArticleReadIndicatorPreference = FlowArticleReadIndicatorPreference.default,
     val flowSortUnreadArticles: SortUnreadArticlesPreference = SortUnreadArticlesPreference.default,
     val flowFonts: ListFontsPreference = ListFontsPreference.default,
+    val flowTitleFonts: TitleFontsPreference = TitleFontsPreference.default,
     val flowTextFontSize: Int = FlowTextFontSizePreference.default,
 
     // Reading page
@@ -63,6 +64,8 @@ data class Settings(
     val readingTitleAlign: ReadingTitleAlignPreference = ReadingTitleAlignPreference.default,
     val readingSubheadAlign: ReadingSubheadAlignPreference = ReadingSubheadAlignPreference.default,
     val readingFonts: ReadingFontsPreference = ReadingFontsPreference.default,
+    val readingTitleFonts: TitleFontsPreference = TitleFontsPreference.default,
+    val readingAutoFullContent: ReadingAutoFullContentPreference = ReadingAutoFullContentPreference.default,
     val readingTitleBold: ReadingTitleBoldPreference = ReadingTitleBoldPreference.default,
     val readingSubheadBold: ReadingSubheadBoldPreference = ReadingSubheadBoldPreference.default,
     val readingTitleUpperCase: ReadingTitleUpperCasePreference = ReadingTitleUpperCasePreference.default,

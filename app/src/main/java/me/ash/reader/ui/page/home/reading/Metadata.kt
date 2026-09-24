@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import me.ash.reader.infrastructure.preference.LocalReadingFonts
 import me.ash.reader.infrastructure.preference.LocalReadingTitleAlign
 import me.ash.reader.infrastructure.preference.LocalReadingTitleBold
+import me.ash.reader.infrastructure.preference.LocalReadingTitleFonts
 import me.ash.reader.infrastructure.preference.LocalReadingTitleUpperCase
 import me.ash.reader.ui.ext.formatAsString
 import me.ash.reader.ui.ext.requiresBidi
@@ -41,6 +42,8 @@ fun Metadata(
     val dateString =
         remember(publishedDate) { publishedDate.formatAsString(context, atHourMinute = true) }
     val fontFamily = LocalReadingFonts.current.asFontFamily(context)
+    // The date, author and feed name are body text; only the headline below gets its own font.
+    val titleFontFamily = LocalReadingTitleFonts.current.asFontFamily(context) ?: fontFamily
 
     val titleUpperCaseString by remember { derivedStateOf { title.uppercase() } }
 
@@ -67,7 +70,7 @@ fun Metadata(
             style =
                 MaterialTheme.typography.headlineLarge
                     .merge(
-                        fontFamily = fontFamily,
+                        fontFamily = titleFontFamily,
                         fontWeight = if (titleBold.value) FontWeight.Bold else FontWeight.Medium,
                     )
                     .applyTextDirection(requiresBidi = title.requiresBidi()),

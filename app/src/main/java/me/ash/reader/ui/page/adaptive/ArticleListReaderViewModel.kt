@@ -322,19 +322,34 @@ constructor(
     }
 
     suspend fun ReaderState.renderContent(articleWithFeed: ArticleWithFeed): ReaderState {
+        // The global auto-fetch setting, as opposed to the feed's own switch. The two are kept
+        // apart because they differ in what happens when the fetch fails.
+        val bySetting = isFullContentOnOpen && !articleWithFeed.feed.isFullContent
         val contentState =
-            if (articleWithFeed.feed.isFullContent) {
+            if (articleWithFeed.feed.isFullContent || bySetting) {
                 val fullContent =
                     readerCacheHelper.readFullContent(articleWithFeed.article.id).getOrNull()
                 if (fullContent != null) ReaderState.FullContent(fullContent)
                 else {
-                    renderFullContent()
+                    // A failed auto-fetch hands back the description that is already in the
+                    // database. Only a fetch the reader asked for reports the error instead.
+                    renderFullContent(
+                        fallbackDescription =
+                            articleWithFeed.article.rawDescription.takeIf { bySetting }
+                    )
                     ReaderState.Loading
                 }
             } else ReaderState.Description(articleWithFeed.article.rawDescription)
 
         return copy(content = contentState)
     }
+
+    /**
+     * `feed.isFullContent` is a per-feed switch; the reading page's auto-full-content setting is the
+     * global one, and either is enough to open on the full content.
+     */
+    private val isFullContentOnOpen: Boolean
+        get() = settingsProvider.settings.readingAutoFullContent.value
 
     fun renderDescriptionContent() {
         _readerState.update {
@@ -344,7 +359,7 @@ constructor(
         }
     }
 
-    fun renderFullContent() {
+    fun renderFullContent(fallbackDescription: String? = null) {
         val fetchJob =
             viewModelScope.launch {
                 readerCacheHelper
@@ -356,7 +371,14 @@ constructor(
                     }
                     .onFailure { th ->
                         _readerState.update {
-                            it.copy(content = ReaderState.Error(th.message.toString()))
+                            it.copy(
+                                content =
+                                    fallbackDescription
+                                        ?.let { description ->
+                                            ReaderState.Description(description)
+                                        }
+                                        ?: ReaderState.Error(th.message.toString())
+                            )
                         }
                     }
             }

@@ -6,7 +6,7 @@
 跟随上游时不要重读 diff。按下面的顺序做，每一步都有明确的"看什么、为什么"。
 
 - **基线**：上游合并点 `d2b979cc`
-- **本文档更新于**：2026-09-24（新增 **§9 上游友好度**与本次优化清单；§1 补挂载点）
+- **本文档更新于**：2026-09-24（新增 **§9 上游友好度**、本次优化清单；§1 补挂载点；**§2.8 字体设置的两层结构**与 §9.6 的落盘教训）
 
 ---
 
@@ -25,6 +25,8 @@
 | "全部已读"条件条 | `FlowPage.kt` 的 `bottomBar` 里的 `Column` | 从 content 顶部移到 `FilterBar` **之上**，向上展开（见 §2.7） |
 | "全部已读"的**设置行** | `ui/page/settings/color/flow/FlowPageStylePage.kt` 的「顶部栏」分区 | 位置 + 免确认**两行必须相邻**；曾经被拆到两个分区、相隔 140 行导致没人找得到（见 §2.7） |
 | 新增偏好 | `ui/ext/DataStoreExt.kt` + `preference/{Settings,Preference,SettingsProvider}.kt` | 加一项要同时改 5 个地方，见 §2.6 |
+| 字体设置（每页两行） | 信息流：`ListFonts.kt` 的 `withFlowTitleStyle()` + `ArticleItem.kt` 标题；阅读页：`reading/Metadata.kt` 的 `titleFontFamily` | 每页 = **基础行 + 标题覆盖行**，覆盖行的「跟随」默认值即回落到基础行（见 §2.8） |
+| 打开文章自动拉全文 | `ArticleListReaderViewModel.kt` 的 `isFullContentOnOpen()` / `renderContent()` | 与订阅源自带的 `feed.isFullContent` 是**或**关系，但失败处理故意不同（见 §2.8） |
 | 图标解码尺寸 | `ui/component/FeedIcon.kt` 的私有常量 `FEED_ICON_DECODE_SIZE` | 不传 `size` 会落到 `RYAsyncImage` 的默认 `Size.ORIGINAL`，即按原始分辨率解码 |
 | 已读状态的重组范围 | `ui/page/home/flow/ArticleList.kt` 的 `rememberIsUnread()` | `diffMap` 是 `SnapshotStateMap`，直接读记录的是 map 级依赖；包一层 `derivedStateOf` |
 | Widget 任务入队 | `domain/service/WidgetUpdateWorker.kt` | 一次性任务改 `enqueueUniqueWork(KEEP)`；预览守卫从实例字段改成进程级标记 |
@@ -33,7 +35,9 @@
 **新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass}.kt`、
 `ui/component/ListFonts.kt`、`infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
 `ListFontsPreference.kt`、`MarkAsReadButtonPositionPreference.kt`、
-`MarkAllAsReadWithoutConfirmPreference.kt`、`app/src/main/baseline-prof.txt`、四个 workflow、
+`MarkAllAsReadWithoutConfirmPreference.kt`、`TitleFontsPreference.kt`、
+`{Flow,Reading}TitleFontsPreference.kt`、`ReadingAutoFullContentPreference.kt`、
+`app/src/main/baseline-prof.txt`、四个 workflow、
 4 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
 `OkHttpClientModuleTest`）。
 
@@ -198,6 +202,51 @@ navigationIcon = {
 `MarkAsReadConditions.All`，且条件条永远不会展开 → **7 天 / 3 天 / 1 天这三个选项变得不可达**。
 目前是二元开关（要确认 / 不要确认），不是三态。若将来有人想要"不确认但要按 3 天"，需要把它
 改成三态偏好，别在 `onMarkAsReadClick` 里堆 `if`。
+
+---
+
+### 2.8 字体设置是两层：基础行 + 标题覆盖行（2026-09-24 加）
+
+信息流和阅读页各有**两行**字体设置，**不是两个平级的独立设置**：
+
+| 页面 | 基础行（原有） | 覆盖行（新增，默认「跟随页面字体」） |
+|---|---|---|
+| 信息流 | 「列表字体」`flowFonts` → 摘要 + 订阅名 + 时间 | 「标题字体」`flowTitleFonts` → 文章标题 |
+| 阅读页 | 「阅读字体」`readingFonts` → 正文 + 各级小标题 + 日期/作者/订阅名 | 「标题字体」`readingTitleFonts` → 文章大标题 |
+
+**为什么是"覆盖"而不是"两个独立设置"**：`TitleFontsPreference.Follow` 的语义是*回落到基础行*，
+所以任意 (标题字体, 正文字体) 组合都可达 —— 把基础行设成正文那个、覆盖行设成标题那个即可，
+反过来也行。收益是**默认值就是零变化**：不动这项的老用户，观感与升级前一致，也不需要数据迁移。
+代价只是 UI 上多了一层"跟随"的概念。
+
+渲染接线只有三处，都很浅：
+
+- **信息流标题**：`ui/component/ListFonts.kt` 的 `withFlowTitleStyle()`（唯一新增的样式入口），
+  `ArticleItem.kt` 标题那一行从 `.withFlowListStyle()` 改成它。
+  **它内部照样调 `withListStyle`，所以字号缩放与基线完全不变** —— 别在这里另算一遍 scale，
+  否则 §2.2 的 16sp 基线守卫与它不一致。
+- **阅读页标题**：`ui/page/home/reading/Metadata.kt` 的 `titleFontFamily`（`?:` 回落到
+  `fontFamily`），**只作用于 `headlineLarge` 那一处**；同文件的日期 / 作者 / 订阅名是正文，
+  继续跟 `readingFonts`。WebView 渲染器不受影响 —— 标题始终由 Compose 的 `Metadata` 画，
+  `RYWebView` 只注入正文。
+- **设置页预览**：`TitleAndTextPreview.kt` 的标题预览也用覆盖行，否则改完设置看到的预览是假的。
+
+上游合并时要看的两点：
+
+- [ ] `ArticleItem.kt` 的标题是否仍走 `.merge(lineHeight = 22.sp).withFlowTitleStyle()`。
+      上游若调整标题样式，只把最后那个扩展函数换掉，**别把 `withFlowListStyle` 也一起换回来**。
+- [ ] `Metadata.kt` 里 `headlineLarge` 是否仍是标题、`labelMedium` 是否仍是元数据。
+      上游若换掉，`titleFontFamily` 的作用位置要跟着挪。
+
+**「打开文章自动拉取全文」**（同批加的 `readingAutoFullContent`，默认关）只落在一个地方：
+`ArticleListReaderViewModel.renderContent()`。它与订阅源自带的 `feed.isFullContent` 是**或**关系，
+但两者**故意区别对待失败**：
+
+- 订阅源自己开了全文 → 失败仍显示错误（**保持上游行为不变**）。
+- 只有全局设置开了（`bySetting`）→ 失败**回落到 RSS 描述**（`renderFullContent(fallbackDescription)`）。
+  这只是"省一次点击"，不该把数据库里已经有的正文换成一条报错。
+
+工具栏那个全文按钮**没有动**，它本来就是切换：设置开着时，第一下点击就是切回描述。
 
 ---
 
@@ -485,6 +534,33 @@ git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
 - 新增 `app/src/main/baseline-prof.txt`（启动入口 + 首屏类）。**注意**：AndroidX AAR 自带的 profile
   早已由 AGP 合并，缺的只是应用自身的那一半。
 - `MainActivity` 的 `"${e.printStackTrace()}"` 改成把异常作为参数传入（原写法日志永远是 `kotlin.Unit`）。
+
+**设置项（2026-09-24 追加）**
+
+- 信息流与阅读页各加一行「标题字体」，把原来"一页一种字体"拆成「基础行 + 标题覆盖行」两层。
+  语义、理由与上游合并注意点全部写在 **§2.8**。
+- 3 个新偏好 `flowTitleFonts` / `readingTitleFonts` / `readingAutoFullContent`
+  都按 §2.6 的**5 处清单**注册 —— 本轮实测漏了其中 3 处，见 §9.6。
+- 阅读页新增「自动拉取全文」开关（默认关）：进入文章即拉全文，不用再点工具栏的全文解析。
+  **工具栏按钮保留、行为不变。**
+- 4 个新文件：`TitleFontsPreference.kt`（两个页面共用同一套选项）、
+  `{Flow,Reading}TitleFontsPreference.kt`、`ReadingAutoFullContentPreference.kt`。
+- 4 条新字符串，`values/` 与 `values-zh-rCN/` 各一份，**都追加在 `</resources>` 之前**
+  （上游友好度最高的位置）。
+
+### 9.6 本轮的一个教训：改动"报成功"不等于已落盘
+
+这批改动里，**有 3 处 Edit 回报成功但文件没变**（IDE 同时开着这些文件，先出现
+`EBUSY: resource busy or locked`，之后若干条成功消息未落盘）。漏掉的恰好是**声明行**：
+`var titleFontsDialogVisible`、`val titleFonts`、以及 `keyList` 里的两行 —— 引用处都在，
+`grep` 看着"改好了"，实际是**编译错误**。
+
+抓出来的办法是**收尾跑一遍断言**，而不是重新读代码。已经把方法沉淀进技能
+`android-edit-verify-offline` §1.4b + `scripts/patch_text.py`（CRLF 感知、幂等、原子写入、
+`apply` 与 `check` 两个模式）。**同步上游后改本 fork 也照此办理。**
+
+顺带一个同源的坑：工作区是 **CRLF**，用 `\n` 写多行锚点会匹配 0 次，
+报错长得像"锚点写错了"，实际是行尾不对。
 
 ### 9.4 明确没做（省得将来重复考虑）
 

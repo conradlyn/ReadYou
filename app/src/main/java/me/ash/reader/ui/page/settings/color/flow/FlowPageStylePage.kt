@@ -44,6 +44,7 @@ fun FlowPageStylePage(
     val markAsReadButtonPosition = LocalMarkAsReadButtonPosition.current
     val markAllAsReadWithoutConfirm = LocalMarkAllAsReadWithoutConfirm.current
     val fonts = LocalFlowFonts.current
+    val titleFonts = LocalFlowTitleFonts.current
     val fontSize = LocalFlowTextFontSize.current
 
     val settings = LocalSettings.current
@@ -66,6 +67,7 @@ fun FlowPageStylePage(
     var filterBarPaddingValue: Int? by remember { mutableStateOf(filterBarPadding) }
 
     var fontsDialogVisible by remember { mutableStateOf(false) }
+    var titleFontsDialogVisible by remember { mutableStateOf(false) }
     var fontSizeDialogVisible by remember { mutableStateOf(false) }
 
     var fontSizeValue: Int? by remember { mutableStateOf(fontSize) }
@@ -126,6 +128,13 @@ fun FlowPageStylePage(
                         title = stringResource(R.string.list_fonts),
                         desc = fonts.toDesc(context),
                         onClick = { fontsDialogVisible = true },
+                    ) {}
+                    // The list row above stays the page-wide font, so it is what the summary
+                    // follows and what this row falls back to.
+                    SettingItem(
+                        title = stringResource(R.string.title_fonts),
+                        desc = titleFonts.toDesc(context),
+                        onClick = { titleFontsDialogVisible = true },
                     ) {}
                     SettingItem(
                         title = stringResource(R.string.font_size),
@@ -473,6 +482,22 @@ fun FlowPageStylePage(
         }
     ) {
         fontsDialogVisible = false
+    }
+
+    RadioDialog(
+        visible = titleFontsDialogVisible,
+        title = stringResource(R.string.title_fonts),
+        options = TitleFontsPreference.values.map {
+            RadioDialogOption(
+                text = it.toDesc(context),
+                style = it.asFontFamily(context)?.let { family -> TextStyle(fontFamily = family) },
+                selected = it == titleFonts,
+            ) {
+                FlowTitleFontsPreference.put(context, scope, it)
+            }
+        }
+    ) {
+        titleFontsDialogVisible = false
     }
 
     TextFieldDialog(

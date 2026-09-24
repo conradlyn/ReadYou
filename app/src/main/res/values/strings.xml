@@ -390,4 +390,8 @@
     <string name="parse_full_content_desc">Fetch full articles from webpages</string>
     <string name="enable">Enable</string>
     <string name="disable">Disable</string>
+    <string name="title_fonts">Title font</string>
+    <string name="follow_page_font">Same as the page font</string>
+    <string name="auto_fetch_full_content">Fetch full content on open</string>
+    <string name="auto_fetch_full_content_desc">Fetch the full article from its webpage as soon as it opens, instead of tapping \"Parse full content\"</string>
 </resources>

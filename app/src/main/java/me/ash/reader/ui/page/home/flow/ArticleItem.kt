@@ -77,6 +77,7 @@ import me.ash.reader.ui.component.menu.AnimatedDropdownMenu
 import me.ash.reader.ui.component.swipe.SwipeAction
 import me.ash.reader.ui.component.swipe.SwipeableActionsBox
 import me.ash.reader.ui.component.withFlowListStyle
+import me.ash.reader.ui.component.withFlowTitleStyle
 import me.ash.reader.ui.ext.requiresBidi
 import me.ash.reader.ui.ext.surfaceColorAtElevation
 import me.ash.reader.ui.page.settings.color.flow.generateArticleWithFeedPreview
@@ -237,7 +238,7 @@ fun ArticleItem(
                             MaterialTheme.typography.titleMedium
                                 .applyTextDirection(title.requiresBidi())
                                 .merge(lineHeight = 22.sp)
-                                .withFlowListStyle(),
+                                .withFlowTitleStyle(),
                         maxLines =
                             if (articleListDesc != FlowArticleListDescPreference.NONE) 2 else 4,
                         overflow = TextOverflow.Ellipsis,

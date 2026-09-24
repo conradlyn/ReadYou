@@ -354,4 +354,8 @@
     <string name="parse_full_content_desc">从网页获取完整内容</string>
     <string name="enable">启用</string>
     <string name="disable">停用</string>
+    <string name="title_fonts">标题字体</string>
+    <string name="follow_page_font">跟随页面字体</string>
+    <string name="auto_fetch_full_content">自动拉取全文</string>
+    <string name="auto_fetch_full_content_desc">打开文章时直接拉取全文，无需再点“全文解析”</string>
 </resources>

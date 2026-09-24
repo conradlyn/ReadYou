@@ -40,16 +40,20 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.LocalPullToSwitchArticle
+import me.ash.reader.infrastructure.preference.LocalReadingAutoFullContent
 import me.ash.reader.infrastructure.preference.LocalReadingAutoHideToolbar
 import me.ash.reader.infrastructure.preference.LocalReadingBoldCharacters
 import me.ash.reader.infrastructure.preference.LocalReadingFonts
 import me.ash.reader.infrastructure.preference.LocalReadingPageTonalElevation
 import me.ash.reader.infrastructure.preference.LocalReadingRenderer
 import me.ash.reader.infrastructure.preference.LocalReadingTheme
+import me.ash.reader.infrastructure.preference.LocalReadingTitleFonts
 import me.ash.reader.infrastructure.preference.ReadingFontsPreference
 import me.ash.reader.infrastructure.preference.ReadingPageTonalElevationPreference
 import me.ash.reader.infrastructure.preference.ReadingRendererPreference
 import me.ash.reader.infrastructure.preference.ReadingThemePreference
+import me.ash.reader.infrastructure.preference.ReadingTitleFontsPreference
+import me.ash.reader.infrastructure.preference.TitleFontsPreference
 import me.ash.reader.infrastructure.preference.not
 import me.ash.reader.ui.component.ReadingThemePrev
 import me.ash.reader.ui.component.base.DisplayText
@@ -80,6 +84,8 @@ fun ReadingStylePage(
     val readingTheme = LocalReadingTheme.current
     val tonalElevation = LocalReadingPageTonalElevation.current
     val fonts = LocalReadingFonts.current
+    val titleFonts = LocalReadingTitleFonts.current
+    val autoFullContent = LocalReadingAutoFullContent.current
     val autoHideToolbar = LocalReadingAutoHideToolbar.current
     val pullToSwitchArticle = LocalPullToSwitchArticle.current
     val renderer = LocalReadingRenderer.current
@@ -88,6 +94,7 @@ fun ReadingStylePage(
     var tonalElevationDialogVisible by remember { mutableStateOf(false) }
     var rendererDialogVisible by remember { mutableStateOf(false) }
     var fontsDialogVisible by remember { mutableStateOf(false) }
+    var titleFontsDialogVisible by remember { mutableStateOf(false) }
 
     val launcher =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -188,6 +195,22 @@ fun ReadingStylePage(
                         desc = fonts.toDesc(context),
                         onClick = { fontsDialogVisible = true },
                     ) {}
+                    // Same split as the flow page: the row above stays the body font, this one the
+                    // headline, and the headline falls back to it.
+                    SettingItem(
+                        title = stringResource(R.string.title_fonts),
+                        desc = titleFonts.toDesc(context),
+                        onClick = { titleFontsDialogVisible = true },
+                    ) {}
+                    SettingItem(
+                        title = stringResource(R.string.auto_fetch_full_content),
+                        desc = stringResource(R.string.auto_fetch_full_content_desc),
+                        onClick = { (!autoFullContent).put(context, scope) },
+                    ) {
+                        RYSwitch(activated = autoFullContent.value) {
+                            (!autoFullContent).put(context, scope)
+                        }
+                    }
                     SettingItem(
                         title = stringResource(R.string.auto_hide_toolbars),
                         onClick = {
@@ -315,5 +338,21 @@ fun ReadingStylePage(
         }
     ) {
         fontsDialogVisible = false
+    }
+
+    RadioDialog(
+        visible = titleFontsDialogVisible,
+        title = stringResource(R.string.title_fonts),
+        options = TitleFontsPreference.values.map {
+            RadioDialogOption(
+                text = it.toDesc(context),
+                style = it.asFontFamily(context)?.let { family -> TextStyle(fontFamily = family) },
+                selected = it == titleFonts,
+            ) {
+                ReadingTitleFontsPreference.put(context, scope, it)
+            }
+        }
+    ) {
+        titleFontsDialogVisible = false
     }
 }

@@ -105,6 +105,7 @@ class SettingsProvider @Inject constructor(
             LocalFlowArticleListReadIndicator provides settings.flowArticleListReadIndicator,
             LocalSortUnreadArticles provides settings.flowSortUnreadArticles,
             LocalFlowFonts provides settings.flowFonts,
+            LocalFlowTitleFonts provides settings.flowTitleFonts,
             LocalFlowTextFontSize provides settings.flowTextFontSize,
 
             // Reading page
@@ -122,6 +123,8 @@ class SettingsProvider @Inject constructor(
             LocalReadingTitleAlign provides settings.readingTitleAlign,
             LocalReadingSubheadAlign provides settings.readingSubheadAlign,
             LocalReadingFonts provides settings.readingFonts,
+            LocalReadingTitleFonts provides settings.readingTitleFonts,
+            LocalReadingAutoFullContent provides settings.readingAutoFullContent,
             LocalReadingTitleBold provides settings.readingTitleBold,
             LocalReadingSubheadBold provides settings.readingSubheadBold,
             LocalReadingTitleUpperCase provides settings.readingTitleUpperCase,

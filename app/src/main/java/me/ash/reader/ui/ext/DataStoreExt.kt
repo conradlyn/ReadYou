@@ -164,6 +164,7 @@ sealed interface PreferencesKey {
         const val flowArticleListReadIndicator = "flowArticleListReadStatusIndicator"
         const val flowSortUnreadArticles = "flowArticleListSortUnreadArticles"
         const val flowFonts = "flowFonts"
+        const val flowTitleFonts = "flowTitleFonts"
         const val flowTextFontSize = "flowTextFontSize"
 
         // Reading page
@@ -180,6 +181,8 @@ sealed interface PreferencesKey {
         const val readingSubheadAlign = "readingSubheadAlign"
         const val readingTheme = "readingTheme"
         const val readingFonts = "readingFonts"
+        const val readingTitleFonts = "readingTitleFonts"
+        const val readingAutoFullContent = "readingAutoFullContent"
         const val readingAutoHideToolbar = "readingAutoHideToolbar"
         const val readingTitleBold = "readingTitleBold"
         const val readingSubheadBold = "readingSubheadBold"
@@ -248,6 +251,7 @@ sealed interface PreferencesKey {
                 IntKey(flowArticleListReadIndicator),
                 BooleanKey(flowSortUnreadArticles),
                 IntKey(flowFonts),
+                IntKey(flowTitleFonts),
                 IntKey(flowTextFontSize),
                 // Reading page
                 IntKey(readingRenderer),
@@ -263,6 +267,8 @@ sealed interface PreferencesKey {
                 IntKey(readingSubheadAlign),
                 IntKey(readingTheme),
                 IntKey(readingFonts),
+                IntKey(readingTitleFonts),
+                BooleanKey(readingAutoFullContent),
                 BooleanKey(readingAutoHideToolbar),
                 BooleanKey(readingTitleBold),
                 BooleanKey(readingSubheadBold),
@@ -338,6 +344,7 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
         const val flowArticleListReadIndicator = "flowArticleListReadStatusIndicator"
         const val flowSortUnreadArticles = "flowArticleListSortUnreadArticles"
         const val flowFonts = "flowFonts"
+        const val flowTitleFonts = "flowTitleFonts"
         const val flowTextFontSize = "flowTextFontSize"
 
         // Reading page
@@ -354,6 +361,8 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
         const val readingSubheadAlign = "readingSubheadAlign"
         const val readingTheme = "readingTheme"
         const val readingFonts = "readingFonts"
+        const val readingTitleFonts = "readingTitleFonts"
+        const val readingAutoFullContent = "readingAutoFullContent"
         const val readingAutoHideToolbar = "readingAutoHideToolbar"
         const val readingTitleBold = "readingTitleBold"
         const val readingSubheadBold = "readingSubheadBold"
@@ -465,6 +474,8 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
                         Boolean::class.java,
                     ),
                 flowFonts to DataStoreKey(intPreferencesKey(flowFonts), Int::class.java),
+                flowTitleFonts to
+                    DataStoreKey(intPreferencesKey(flowTitleFonts), Int::class.java),
                 flowTextFontSize to
                     DataStoreKey(intPreferencesKey(flowTextFontSize), Int::class.java),
                 // Reading page
@@ -492,6 +503,13 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
                     DataStoreKey(intPreferencesKey(readingSubheadAlign), Int::class.java),
                 readingTheme to DataStoreKey(intPreferencesKey(readingTheme), Int::class.java),
                 readingFonts to DataStoreKey(intPreferencesKey(readingFonts), Int::class.java),
+                readingTitleFonts to
+                    DataStoreKey(intPreferencesKey(readingTitleFonts), Int::class.java),
+                readingAutoFullContent to
+                    DataStoreKey(
+                        booleanPreferencesKey(readingAutoFullContent),
+                        Boolean::class.java,
+                    ),
                 readingAutoHideToolbar to
                     DataStoreKey(
                         booleanPreferencesKey(readingAutoHideToolbar),
