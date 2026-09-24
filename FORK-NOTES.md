@@ -34,6 +34,8 @@
 | 平板缩放（图标 / 控件高度） | `ui/adaptive/AdaptiveSizing.kt` 的 `adaptiveSize()` + 15 个调用点 | **Compact 恒等**；只放大字形与承载它的栏高，见 §2.2 / §2.3 |
 | FilterBar / 搜索栏跟随页面字号 | `ui/component/FilterBar.kt` 的 `labelStyle` 参数、`flow/SearchBar.kt` 的 `textStyle` 参数 | 默认值与上游逐字节等价，调用点可原样不传 |
 | 两页**各自**的自定义 TTF | `ui/ext/ListExternalFonts.kt` 的 `Slot.Feeds` / `Slot.Flow` | 不新增偏好键，复用 `ListFontsPreference.External` |
+| 平板触控目标 | `ui/adaptive/AdaptiveSizing.kt` 的 `Modifier.adaptiveIconButtonContainer()` + 2 个调用点 | **手机档一个尺寸都不传**；传了会把 48dp 压小，见 §2.2 / §9.8 |
+| 列表行高与内边距 | `GroupItem.kt`(5) / `FeedItem.kt`(4) / `ArticleItem.kt`(10) 处内边距，各包一层 `adaptiveSize()` | 其中 `ArticleItem` 的 `start = 30.dp` 是给 `FeedIcon` 预留的缩进，属**正确性**而非美观，见 §9.8 |
 
 **新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass,AdaptiveSizing}.kt`、
 `ui/component/ListFonts.kt`、`ui/ext/ListExternalFonts.kt`、
@@ -78,6 +80,14 @@
       报警器是 `AdaptiveScaleTest`；`Medium` 档也**不能省**，8.8" 平板竖屏约 800dp 落的就是它。
 - [ ] `ui/adaptive/AdaptiveSizing.kt` 的 `scaledDp(base, scale)` 是否仍是唯一的缩放算术入口。
       `adaptiveSize()` 只是它的 `@Composable` 包装 —— 纯函数才能被单测钉住，别把算术挪回包装里。
+- [ ] **`Modifier.adaptiveIconButtonContainer()` 在手机档必须原样返回 `this`**（`ui/adaptive/AdaptiveSizing.kt`）。
+      `IconButton` 的修饰符链是 `modifier.minimumInteractiveComponentSize().size(40.dp)`，**调用方传进来的
+      `modifier` 落在最前面**，因此外部传的 `size` 会压住 `minimumInteractiveComponentSize()` 保留的
+      **48dp**——即把触控目标从 48dp **缩小**到我们传的值。手机档传 `48.dp` 同样是错的（等于把平台的保留值
+      写死成常量），必须什么都不传。平板档的 `maxOf(adaptiveSize(40.dp), 48.dp)` 也是被这一点逼出来的：
+      40dp × 1.15 = 46dp 仍然小于 48dp。
+      Material 自己的 KDoc 就写着这条约束（"it must come before any size modifiers on the element that
+      might limit its constraints"）。**这是"改进"最容易变成退步的一处。**
 
 ### 2.3 限宽的行为边界
 
@@ -575,8 +585,9 @@ git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
 
 1. **不放大文本**。用户已有显式可见的字号旋钮；再叠一层隐式全局倍率会让设置页显示的数字变成谎言。
    这个错误这一层犯过并已回退，完整理由写在 `AdaptiveLayout.kt` 的 KDoc 里。
-2. **不放大触控目标与列表行高**。用户在本轮的选择里**明确只勾了「顶栏与 FilterBar 高度」**，
-   没勾「触控目标」和「列表行高与内边距」。图标字形必然包含在勾选项内。
+2. ~~**不放大触控目标与列表行高**。~~ **已作废，不要按这条判断。** 当时用户只勾了「顶栏与 FilterBar 高度」，
+   没勾「触控目标」和「列表行高与内边距」。**下一轮用户补勾了这两项，已落地，见 §9.8。**
+   保留此条只为记录当时的范围。图标字形始终包含在勾选项内。
 3. **两页各自导入不新增偏好键**。靠「文件路径 + 槽位参数」区分，`ListFontsPreference` 复用现有
    `External(5)` 值 —— 避开了 §2.6 的「漏一处静默失效」陷阱，偏好注册面零增长。
 
@@ -712,3 +723,35 @@ git apply --check "C:/Users/lfk/AppData/Local/Temp/forkup/p<N>.diff"
 
 **规模参考**：本轮 APK 只涨 3,864 B —— 缩放层是纯参数改动，没有新增依赖、没有新增资源，
 连新增的 3 条字符串 × 3 个 locale 也只是几 KB 的 XML。
+
+---
+
+### 9.8 平板触控目标与列表内边距（2026-09-24，第二轮）
+
+用户原话：「刚才还有哪些你建议要调整但是我没选的？再让我多选。」→ 补勾了「触控目标」与
+「列表行高与内边距」两项（第三项「设置页与对话框字号」另开一轮）。提交 `95f715c3`。
+
+| 项 | 落点 | 上游友好度 |
+|---|---|---|
+| 触控目标随尺寸类放大 | `AdaptiveSizing.kt` 新增 `Modifier.adaptiveIconButtonContainer()`；`FeedbackIconButton.kt` / `CanBeDisabledIconButton.kt` 各 1 行 | 高：手机档返回 `this`，修饰符链与上游完全一致 |
+| 列表行高与内边距 | `GroupItem.kt` 5 处、`FeedItem.kt` 4 处、`ArticleItem.kt` 10 处，每处只包一层 `adaptiveSize()` | 高：全部是「替换一个参数」，无缩进重排 |
+
+**必须记住的一件事：触控目标原本就是 48dp，不是 40dp。**
+`IconButton` 的 40dp 只是**可见容器**（`SmallIconButtonTokens.ContainerHeight`，实测自 material3 1.4.0 源码），
+它同时调用 `minimumInteractiveComponentSize()` 把**可点区域保留到至少 48dp**（`InteractiveComponentSize` 实测 48dp）。
+我此前告诉用户"可点区域是 40dp"，**是错的**。若按那个前提加 `Modifier.size(46.dp)`，会把 48dp **压成 46dp**，
+是**退步**。所以 `adaptiveIconButtonContainer()` 是双条件的：手机档什么都不传，平板档才 `maxOf(..., 48.dp)`。
+详见 §2.2 的核验项。
+
+**`ArticleItem` 的 `start = 30.dp` 属正确性问题。** 那是给已放大的 `FeedIcon` 预留的缩进；
+不同步放大，图标会压住标题文字。
+
+**一并放大的还有滑动操作图标**（`ArticleItem.kt` 两处 `padding(horizontal = 24.dp)` 各加
+`.size(adaptiveSize(24.dp))`）：行变高、滑动背景变大之后，固定 24dp 的图标会显小。
+
+**刻意没动**：`SubscribeDialog` / `FeedOptionDrawer` 里的 `FeedIcon` 保持原尺寸（不在本轮范围）。
+
+**核验状态（不完整，如实记录）**：`v0.16.2-tablet.12` 已发布（releases 页面确认），因此
+`Fork Auto Release` 至少是成功的 —— 它依赖 `assembleGithubRelease`，即**编译通过**已间接成立。
+但 `Build Commit` / `Unit Tests` 两个 job 的结论**没取到**：GitHub API 匿名配额用尽（`403 rate limit`），
+`/actions` 页面被安全策略拦截（`SENSITIVE_CONTENT_UNAVAILABLE`）。下次 push 后一并补读。
