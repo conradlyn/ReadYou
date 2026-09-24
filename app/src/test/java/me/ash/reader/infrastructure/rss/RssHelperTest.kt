@@ -87,4 +87,96 @@ class RssHelperTest {
         """
         Assert.assertEquals(imageUrlString, rssHelper.findThumbnail(case))
     }
+
+    @Test
+    fun testParseRss20Feed() {
+        val sampleFeedXml = """
+            <?xml version="1.0"?>
+            <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+             <channel>
+                <title>Phoronix</title>
+                <link>https://www.phoronix.com/</link>
+                <description>Linux Hardware Reviews, Performance Benchmarks</description>
+                <language>en-us</language>
+              <item>
+               <title>Sample Linux Article</title>
+               <link>https://www.phoronix.com/news/sample-linux-article</link>
+               <guid>https://www.phoronix.com/news/sample-linux-article</guid>
+               <description>Sample article description.</description>
+               <pubDate>Sun, 23 Aug 2026 07:41:04 -0400</pubDate>
+               <dc:creator>Michael Larabel</dc:creator>
+              </item>
+             </channel>
+            </rss>
+        """.trimIndent()
+
+        val inputStream = java.io.ByteArrayInputStream(sampleFeedXml.toByteArray(Charsets.UTF_8))
+        val syndFeed = com.rometools.rome.io.SyndFeedInput().build(com.rometools.rome.io.XmlReader(inputStream, "text/xml; charset=UTF-8"))
+        Assert.assertEquals("Phoronix", syndFeed.title)
+        Assert.assertEquals(1, syndFeed.entries.size)
+        Assert.assertEquals("Sample Linux Article", syndFeed.entries[0].title)
+        Assert.assertEquals("Michael Larabel", syndFeed.entries[0].author)
+    }
+
+    // 上游 PR #1322 另带两个"真实网络"测试（testRealSearchFeedPhoronix / testRealDiscoverFeedPhoronix），
+    // 会真的去请求 https://www.phoronix.com —— 单测依赖外部站点的可用性与反爬策略，
+    // 会让 CI 变成偶发红灯。本 fork 未采用（上游合并该 PR 后请同样处理）。
+
+    // 以下 4 个来自上游 PR #1323（纯本地字节序列，不触网）
+
+    @Test
+    fun testDetectHtmlCharsetFromHeaderWithComma() {
+        val bytes = "<html><body>Test</body></html>".toByteArray(Charsets.ISO_8859_1)
+        val charset = rssHelper.detectHtmlCharset("text/html, charset=iso-8859-1", bytes)
+        Assert.assertEquals(Charsets.ISO_8859_1, charset)
+    }
+
+    @Test
+    fun testDetectHtmlCharsetFromMetaCharset() {
+        val html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="iso-8859-1">
+                <title>Test</title>
+            </head>
+            <body>Perplexity a lancé son abonnement</body>
+            </html>
+        """.trimIndent()
+        val bytes = html.toByteArray(Charsets.ISO_8859_1)
+        val charset = rssHelper.detectHtmlCharset("text/html", bytes)
+        Assert.assertEquals(Charsets.ISO_8859_1, charset)
+
+        val decoded = String(bytes, charset)
+        Assert.assertTrue(decoded.contains("Perplexity a lancé son abonnement"))
+        Assert.assertFalse(decoded.contains("\uFFFD"))
+    }
+
+    @Test
+    fun testDetectHtmlCharsetFromMetaHttpEquiv() {
+        val html = """
+            <html>
+            <head>
+                <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+            </head>
+            <body>Déjà vu été français</body>
+            </html>
+        """.trimIndent()
+        val win1252 = java.nio.charset.Charset.forName("windows-1252")
+        val bytes = html.toByteArray(win1252)
+        val charset = rssHelper.detectHtmlCharset(null, bytes)
+        Assert.assertEquals(win1252, charset)
+
+        val decoded = String(bytes, charset)
+        Assert.assertTrue(decoded.contains("Déjà vu été français"))
+    }
+
+    @Test
+    fun testFrenchCharactersDecodingAccuracy() {
+        val originalFrenchText = "Club des développeurs : Actualités, cours, tutoriels & événements d'ingénierie"
+        val bytes = originalFrenchText.toByteArray(Charsets.ISO_8859_1)
+        val charset = rssHelper.detectHtmlCharset("text/html, charset=iso-8859-1", bytes)
+        val decoded = String(bytes, charset)
+        Assert.assertEquals(originalFrenchText, decoded)
+    }
 }

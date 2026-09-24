@@ -105,7 +105,7 @@ internal class AppUriHandler(
                     }
                 } catch (_: Throwable) {
                     showToast(getString(R.string.open_link_something_wrong))
-                    startActivity(intent)
+                    startActivity(intent.setPackage(null))
                 }
             }
         }
