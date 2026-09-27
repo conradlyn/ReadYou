@@ -174,6 +174,18 @@ fun FlowPage(
     var markAsRead by remember { mutableStateOf(false) }
     var onSearch by rememberSaveable { mutableStateOf(false) }
 
+    // Filled in by the list as it composes. Declared here rather than beside its use because the
+    // mark-as-read actions below need it: whether there was anything to mark is what separates
+    // "this action just emptied the page" from "this page was already empty".
+    var pagingItems: LazyPagingItems<ArticleFlowItem>? by remember { mutableStateOf(null) }
+
+    // One-shot. Set by a mark-as-read action that had articles to work on; the list then going
+    // empty means this subscription has nothing left to read, and staying on an empty page is a
+    // dead end - the next thing the user wants is another feed. Keyed on `pagerData` so that
+    // changing filter or search disarms it: the empty list would no longer be the one that action
+    // emptied.
+    var leavingWhenEmpty by remember(pagerData) { mutableStateOf(false) }
+
     // Shared by both placements of the button, so the two can never drift apart.
     val onMarkAsReadClick: () -> Unit = {
         when {
@@ -181,6 +193,7 @@ fun FlowPage(
             markAsRead -> markAsRead = false
             // Opt-in shortcut: straight to "everything is read", with no condition bar in between.
             markAllAsReadWithoutConfirm -> {
+                leavingWhenEmpty = (pagingItems?.itemCount ?: 0) > 0
                 viewModel.updateReadStatus(
                     groupId = filterUiState.group?.id,
                     feedId = filterUiState.feed?.id,
@@ -315,8 +328,6 @@ fun FlowPage(
         }
 
     val readerState = viewModel.readerStateStateFlow.collectAsStateValue()
-
-    var pagingItems: LazyPagingItems<ArticleFlowItem>? by remember { mutableStateOf(null) }
 
     if (isTwoPane) {
         LaunchedEffect(readerState) {
@@ -547,6 +558,24 @@ fun FlowPage(
                     val filterState = flowUiState.pagerData.filterState
                     val pagingItems = pager.collectAsLazyPagingItems().also { pagingItems = it }
 
+                    // Hand the page back once a mark-as-read has left nothing behind.
+                    LaunchedEffect(pagingItems) {
+                        snapshotFlow {
+                                Triple(
+                                    leavingWhenEmpty,
+                                    pagingItems.itemCount,
+                                    pagingItems.loadState.isIdle,
+                                )
+                            }
+                            .collect { (armed, count, isIdle) ->
+                                if (shouldLeaveAfterMarkAsRead(armed, count, isIdle)) {
+                                    leavingWhenEmpty = false
+                                    onSearch = false
+                                    onNavigateUp()
+                                }
+                            }
+                    }
+
                     if (markAsReadOnScroll && filterState.filter.isUnread()) {
                         LaunchedEffect(listState.isScrollInProgress) {
                             if (!listState.isScrollInProgress) {
@@ -630,6 +659,12 @@ fun FlowPage(
                             is LoadAction.NextFeed -> viewModel::loadNextFeedOrGroup
                             LoadAction.MarkAllAsRead -> {
                                 {
+                                    // The same rule as the button, reached by a different gesture:
+                                    // this pull marks the page read and there is no next feed to
+                                    // move on to, so an empty list afterwards is a dead end too. The
+                                    // `NextFeed` case above needs nothing here - it changes the
+                                    // filter, and that re-keys `leavingWhenEmpty` back to false.
+                                    leavingWhenEmpty = (pagingItems?.itemCount ?: 0) > 0
                                     viewModel.markAllAsRead()
                                     currentPullToLoadState?.animateDistanceTo(
                                         targetValue = 0f,
@@ -741,6 +776,7 @@ fun FlowPage(
 
                         MarkAsReadBar {
                             markAsRead = false
+                            leavingWhenEmpty = (pagingItems?.itemCount ?: 0) > 0
                             viewModel.updateReadStatus(
                                 groupId = filterUiState.group?.id,
                                 feedId = filterUiState.feed?.id,
@@ -794,6 +830,26 @@ fun FlowPage(
         }
     }
 }
+
+/**
+ * Whether a mark-as-read that just finished should hand this page back to the feeds list.
+ *
+ * A feed whose list ends up empty has nothing left to show, and the user's next move is always
+ * another feed - so they are returned to the list of feeds instead of being left on a blank page
+ * with no obvious way out. A pure function rather than an inline condition, because each of the two
+ * guards is silent when it is dropped:
+ *
+ *  - `armed` - without it an empty page navigates away on its own. Opening a feed that is already
+ *    fully read, or searching for something that does not exist, would flash the page and bounce the
+ *    user straight back out of a page they just chose to open.
+ *  - `isIdle` - without it, the reload that the write itself triggers is mistaken for an empty
+ *    result. The count drops to 0 while the replacement page is still loading.
+ *
+ * `FlowPageLeaveTest` pins both, so a refactor that keeps only the `itemCount == 0` half fails in
+ * CI rather than on someone's tablet.
+ */
+fun shouldLeaveAfterMarkAsRead(armed: Boolean, itemCount: Int, isIdle: Boolean): Boolean =
+    armed && isIdle && itemCount == 0
 
 /**
  * The "mark as read" (DoneAll) action, drawn identically wherever the user placed it.
