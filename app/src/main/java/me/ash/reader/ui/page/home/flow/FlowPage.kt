@@ -561,12 +561,12 @@ fun FlowPage(
                     // Hand the page back once a mark-as-read has left nothing behind.
                     LaunchedEffect(pagingItems) {
                         snapshotFlow {
-                                Triple(
-                                    leavingWhenEmpty,
-                                    pagingItems.itemCount,
-                                    pagingItems.loadState.isIdle,
-                                )
-                            }
+                            Triple(
+                                leavingWhenEmpty,
+                                pagingItems.itemCount,
+                                pagingItems.loadState.isIdle,
+                            )
+                        }
                             .collect { (armed, count, isIdle) ->
                                 if (shouldLeaveAfterMarkAsRead(armed, count, isIdle)) {
                                     leavingWhenEmpty = false
@@ -841,7 +841,9 @@ fun FlowPage(
  *
  *  - `armed` - without it an empty page navigates away on its own. Opening a feed that is already
  *    fully read, or searching for something that does not exist, would flash the page and bounce the
- *    user straight back out of a page they just chose to open.
+ *    user straight back out of a page they just chose to open. The worst case is "mark as read on
+ *    scroll": that setting empties the unread list by itself as the user reads down it, so without
+ *    this guard the page would be yanked away from under a finger that is still scrolling.
  *  - `isIdle` - without it, the reload that the write itself triggers is mistaken for an empty
  *    result. The count drops to 0 while the replacement page is still loading.
  *

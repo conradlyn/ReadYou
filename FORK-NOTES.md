@@ -23,6 +23,7 @@
 | 悬停反馈 | `ui/interaction/Clickable.kt` | 触屏无影响，接鼠标才有 |
 | "全部已读"按钮位置 | `FlowPage.kt` 的 `topBar.actions`（Top）/ `bottomBar`（Bottom），按钮本体共用 `MarkAsReadIconButton` | 由偏好 `markAsReadButtonPosition` 决定，**默认 Bottom** = 工具栏左侧 |
 | "全部已读"条件条 | `FlowPage.kt` 的 `bottomBar` 里的 `Column` | 从 content 顶部移到 `FilterBar` **之上**，向上展开（见 §2.7） |
+| 已读后列表空则返回订阅源 | `FlowPage.kt` 的 `leavingWhenEmpty` 标志 + 1 个 `LaunchedEffect` + 纯函数 `shouldLeaveAfterMarkAsRead` | 三个手势都要布防；退出走既有的 `onNavigateUp`。两个静默风险见 §9.10 |
 | "全部已读"的**设置行** | `ui/page/settings/color/flow/FlowPageStylePage.kt` 的「顶部栏」分区 | 位置 + 免确认**两行必须相邻**；曾经被拆到两个分区、相隔 140 行导致没人找得到（见 §2.7） |
 | 新增偏好 | `ui/ext/DataStoreExt.kt` + `preference/{Settings,Preference,SettingsProvider}.kt` | 加一项要同时改 5 个地方，见 §2.6 |
 | 字体设置（每页两行） | 信息流：`ListFonts.kt` 的 `withFlowTitleStyle()` + `ArticleItem.kt` 标题；阅读页：`reading/Metadata.kt` 的 `titleFontFamily` | 每页 = **基础行 + 标题覆盖行**，覆盖行的「跟随」默认值即回落到基础行（见 §2.8） |
@@ -51,8 +52,8 @@
 `{Flow,Reading}TitleFontsPreference.kt`、`ReadingAutoFullContentPreference.kt`、
 `UiTextScalePreference.kt`、
 `app/src/main/baseline-prof.txt`、四个 workflow、
-6 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
-`AdaptiveScaleTest`、`OkHttpClientModuleTest`、`UiTextScaleTest`）。
+7 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
+`AdaptiveScaleTest`、`OkHttpClientModuleTest`、`UiTextScaleTest`、`FlowPageLeaveTest`）。
 
 ---
 
@@ -137,6 +138,13 @@
       → 所以作用域**刻意**限定在 19 条设置路由 + `RYDialog`，不是包 `MaterialTheme`。
       同理 `ui/page/settings/color/{feeds,flow,reading}` 里 4 个预览调用点包了 `ProvideUnscaledUiText { … }`，
       否则预览会撒谎（预览里的列表/阅读样式本就不跟随界面字号）。
+- [ ] **「已读后空列表返回订阅源」的三个布防点都在**（见 §9.10）。搜
+      `leavingWhenEmpty = (pagingItems?.itemCount ?: 0) > 0` 应得 **3** 处（顶栏快捷方式 / 条件条确认 /
+      下拉全部已读）；`FlowPage.kt` 里 `LaunchedEffect(pagingItems)` 应得 **2** 处（本改动 1 + 上游
+      `isSyncing` 滚动 1）；顶层 `shouldLeaveAfterMarkAsRead` 1 处。
+      → 上游若新增第四个「全部已读」入口，**必须**跟着加布防，否则那条路径**静默**不返回。
+      → 若 `var pagingItems` 被挪回 `onMarkAsReadClick` 之后，本改动会**编译失败**（不是静默，算幸运）。
+      → 报警器：`FlowPageLeaveTest`（8 行输入表 + 一条 `&&` 等价性遍历，防止守卫被改成 `||` 或漏掉）。
 
 ### 2.3 限宽的行为边界
 
@@ -344,7 +352,17 @@ navigationIcon = {
       **对话框不跟随 = `LocalDensity` 方案被误用的信号**，见 §2.2
 - [ ] **界面字号 = 150% 时列表页不受影响（关键）**：Feeds / Flow 的列表字号应与 100% 时**完全相同**。
       若变大，说明缩放作用域泄漏出了设置页，列表字号乘了两遍，见 §2.2
-- [ ] **拖滑块**：读数实时变化；拖动中上方控件不"从手指下滑走"（偏好只在松手时落盘）
+- [ ] **拖滑块**：读数实时变化；拖动中上方控件不"从手指滑走"（偏好只在松手时落盘）
+- [ ] **全部已读 → 自动返回（关键）**：在「未读」筛选下打开一个订阅源，按全部已读 →
+      列表清空后应**自动回到订阅源页面**。三种手势都试：顶栏免确认快捷方式 / 条件条确认 / 下拉全部已读
+- [ ] **全部已读但还有文章时不应返回（关键）**：切到「全部」筛选再按全部已读 → 文章仍在，
+      页面**必须留住**。若被弹回，说明少了 `itemCount == 0` 这个守卫，见 §9.10
+- [ ] **打开一个已读完的订阅源不应闪退（关键）**：找一个未读数为 0 的订阅源打开 →
+      页面应**稳定停住**。若一闪就弹回，说明少了 `armed` 守卫，见 §9.10
+- [ ] **搜索无结果不应弹回**：在订阅源里搜一个不存在的词 → 空列表应稳定停住，不自动返回
+- [ ] **「滚动即已读」不应把页面抽走（关键）**：开启该设置，在「未读」筛选下把列表一路读到底 →
+      列表清空时页面**必须留住**，不能在手指还在滑动时被弹回订阅源，见 §9.10
+- [ ] **自动返回落点正确**：返回后应停在订阅源列表（`Feeds`），而不是整个应用退出或停在别处
 - [ ] **切出去再进来**：字号保持
 - [ ] **无障碍：系统字体 200%** —— 确认文本不被裁切（旧版曾覆写 `LocalDensity`，已移除；这是回归验证）
 - [ ] **外接鼠标**：列表项、图标按钮悬停有反馈
@@ -895,9 +913,14 @@ e: .../ui/theme/UiTextScale.kt:112:9  (同上)
 见 §2.2 的核验项。
 
 **为什么这次能拿到错误原文**（本机无 JDK、日志接口要管理员权限，这两个限制一直没变）：
-给 `fork-unit-tests.yaml` 的 `Unit tests` 步骤临时加了 `2>&1 | tee` + 把匹配行
+给 `fork-unit-tests.yaml` 的 `Unit tests` 步骤加了 `2>&1 | tee` + 把匹配行
 `echo "::error::$line"`，**注解在运行页面对匿名读者可见**，于是不用 API 配额也读得到。
-拿到后该临时步骤已移除。
+
+**这条步骤后来决定长期保留，不再当临时补丁**（2026-09-27 定）。理由：让它「临时」的那两个前提
+是**结构性**的，不会随时间消失；而它是本机唯一能看到 Kotlin 编译错误的通道。绿的时候它零成本，
+删掉等于下次再瞎一次。工作流文件本身是本 fork 新建的，保留它不产生任何上游冲突面。
+（`2935a628` 加的，一度以为在 `89c18f5f` 里删掉了——**没有**，`89c18f5f` 只动了
+`FORK-NOTES.md` 与 `UiTextScale.kt`。这是一处需要纠正的记忆。）
 
 **顺带得到的一条通用手段**（比读网页源码可靠）：确认某个 AndroidX API 在当前版本里到底长什么样，
 直接下载对应版本的 AAR，解 `classes.jar`，用 Python 扫 `*.class` 常量池里的方法描述符：
@@ -914,3 +937,74 @@ AAR 地址：`https://dl.google.com/dl/android/maven2/androidx/compose/material3
 用这个方法一次问清了四件事：`LocalTypography` 存在但不可见、**没有** `MaterialTheme.Values` /
 `LocalMaterialTheme`（那是 1.5 的）、`MaterialTheme` 有 4 参和 5 参**两个重载**、
 `MaterialTheme.motionScheme` 访问器是公开的。
+
+### 9.10 全部已读后列表空 → 返回订阅源（2026-09-27，第四轮）
+
+**需求原话**：「在某个订阅的文章清单里面按了全部阅读后，页面还是停留在同一地方，只是文章清单
+不见了。按完全部阅读后，因为本订阅已没有文章了，页面应该返回到订阅源页面。」
+
+**为什么这是个真问题**：`updateReadStatus(conditions = All)` 会把该订阅的未读清零，Room 失效、
+Pager 重载，列表变空——但 `FlowPage` 还在。用户落在一个空白页上，唯一出路是手动按返回，而这时
+他想要的恰恰是「看下一个订阅源」。所以这不是视觉问题，是**死路**。
+
+**落点**（全部在 `FlowPage.kt`，58 行新增 + 2 行移动）：
+
+| 位置 | 作用 |
+|---|---|
+| `var pagingItems` 声明**上移**到 `onMarkAsReadClick` 之前 | 唯一的既有代码移动。布防要读 `itemCount`，所以声明必须早于三个动作 |
+| `var leavingWhenEmpty by remember(pagerData)` | 一次性布防标志。**必须带 `pagerData` 键** |
+| `markAllAsReadWithoutConfirm ->` 分支内 1 行 | 手势①：顶栏免确认快捷方式 |
+| `MarkAsReadBar { }` 回调内 1 行 | 手势②：条件条确认 |
+| `LoadAction.MarkAllAsRead ->` 内 1 行 | 手势③：下拉「全部已读」 |
+| `AnimatedContent` content 内 1 个 `LaunchedEffect(pagingItems)` | 判空并退出 |
+| 顶层纯函数 `shouldLeaveAfterMarkAsRead(armed, itemCount, isIdle)` | 把判定抽出来以便单测 |
+
+**退出动作刻意复用 `onNavigateUp`**，即顶栏返回箭头调的那个
+（`ArticleListReadingPage.kt:146` 传入 `onBack`，`AppEntry.kt:109` 是
+`backStack.removeLastOrNull()`）。**没有新造导航**，所以「按返回」和「自动返回」不可能走岔。
+双栏模式下同样是弹栈回 `Feeds`，语义一致。
+
+**两个静默风险（这是本轮真正的设计内容）**：
+
+1. **误触发**——没有 `armed`，任何「一打开就是空的」页面都会立刻自我弹回：
+   - 已全部读完的订阅源
+   - 搜索无结果
+   - **最要紧的一个：「滚动即已读」**（`markAsReadOnScroll`）。这个设置会**在用户往下读的过程中
+     自己把未读列表清空**，所以少了 `armed` 就会在手指还在滑动时把页面从底下抽走。
+   前两者都是用户**主动打开**的页面，弹回等于把他刚打开的页面闪一下抢走。所以布防条件是
+   「动作发起时 `pagingItems.itemCount > 0`」，即**确实有东西可标记**才布防——
+   滚动已读与自动行为都不布防，只有三个显式「全部已读」手势布防。
+2. **误判空**——没有 `isIdle`，写入自己触发的那次重载会被当成「结果为空」。
+   关键事实：下拉路径的 `markAllAsRead()` 走 `List.updateDiff` + `commitDiffsToDb()`，
+   **确实**会瞬时塌到 0 再填回（逐条写的 `updateReadStatus` 因为 Paging 合并 REMOVE 更新，
+   中途不闪 0）。所以必须等 `loadState.isIdle`。
+
+**为什么 `leavingWhenEmpty` 要带 `pagerData` 键**：切换筛选或改搜索词会把「那个被清空的列表」
+换成另一个列表，标志必须随之失效，否则它会在一个无关的空列表上开火。
+`LoadAction.NextFeed` 因此**不需要**显式布防——它换 filter，`pagerData` 变了，标志自动归零。
+
+**为什么判定要抽成纯函数**：三个守卫里有两个**掉了也编译得过、也能通过手测**，只是行为变错。
+抽出来才能用 JVM 单测把 8 行输入表全钉住（`FlowPageLeaveTest`，6 个用例，含一条
+`armed && idle && count == 0` 的等价性遍历，防止有人把 `&&` 改成 `||`）。
+这与 `scaledDp` / `adaptiveContentGutter` 是同一个套路。
+
+**上游同步后要核验的（加进 §2 的清单）**：
+
+- [ ] `FlowPage.kt` 里 `var pagingItems: LazyPagingItems<ArticleFlowItem>? by remember { mutableStateOf(null) }`
+      仍在 `onMarkAsReadClick` **之前**。上游若把它挪回下面，本改动会**编译不过**（不是静默失效，
+      算幸运）。这是唯一一处「上游动了会冲突」的地方。
+- [ ] 三个布防点还在：搜 `leavingWhenEmpty = (pagingItems?.itemCount ?: 0) > 0` 应得 **3** 处。
+      上游若新增第四个「全部已读」入口，这里要跟着加，否则那条路径**静默**不返回。
+- [ ] `LaunchedEffect(pagingItems)` 在 `FlowPage.kt` 里应得 **2** 处：一处是本改动的（含
+      `shouldLeaveAfterMarkAsRead`），一处是上游原有的（`isSyncing` 时 `scrollToItem(0)`）。
+      只剩 1 处说明本改动被冲掉了。
+- [ ] 上游若把 `AnimatedContent` 的 `contentKey` 或 `AnimatedContent` 本身重构掉，
+      注意本 effect 必须留在 **content lambda 内**——`pagingItems` 是那里的局部 `val`。
+- [ ] 单测 `FlowPageLeaveTest` 直接调用顶层函数，签名 `(Boolean, Int, Boolean)` 是纯基本类型，
+      不依赖 Compose 运行时，所以不需要 `Assume` 守卫（对比 `UiTextScaleTest` 需要）。
+
+**核验结果**：离线括号平衡 + 结构断言全过（布防点 3、`LaunchedEffect(pagingItems)` 2、
+纯函数声明 1、上游 `collectAsLazyPagingItems` 与 `markAllAsRead()` 调用行原样未动）。
+提交 `9c82209c`。**注意：本机没有 JDK / Android SDK，编译由 GitHub Actions 完成，
+所以真正的编译结论要看那三个 job，不以上面的静态检查为准。**
+

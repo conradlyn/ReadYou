@@ -47,10 +47,15 @@ jobs:
       # The same task upstream's testing.yml runs, so green here means the same thing as a green
       # "Run Unit Tests" check on a pull request.
       #
-      # TEMPORARY (remove once the interface-text-size round is green): the development machine has
-      # no JDK and the log-download API needs admin rights, so a Kotlin error would otherwise be
-      # invisible from here. The compiler output is echoed back as annotations, which the run page
-      # renders for anonymous readers. The `tee`/`PIPESTATUS` shape is what keeps the step's exit
+      # The failure echo below is not a temporary diagnostic, even though it started as one. The
+      # development machine for this fork has no JDK, no Android SDK and no Gradle cache, and the
+      # log-download endpoint needs admin rights (`403 Must have admin rights to Repository.`), so a
+      # Kotlin error is otherwise completely invisible from there - the first attempt at the
+      # interface-text-size round burned two full CI cycles before this echo existed. Annotations,
+      # by contrast, render on the public run page for anonymous readers.
+      #
+      # Keeping it costs nothing on a green run. Removing it would make the next compile error a
+      # guessing game again, so it stays. The `tee`/`PIPESTATUS` shape is what keeps the step's exit
       # status equal to Gradle's rather than to `tee`'s.
       - name: Unit tests
         shell: bash
