@@ -1121,11 +1121,31 @@ Pager 重载，列表变空——但 `FlowPage` 还在。用户落在一个空�
 - [ ] 三个新字符串键（`app_interface_fonts` / `summary_fonts` / `tips_import_font`）是否被上游
       同名占用；`values-zh-rCN` / `values-zh-rTW` 需同步（本 fork 已加）。
 
-**核验结果**：离线校验全过——3 个 strings.xml 格式良好且无重名、新键三处齐全、22 个 Kotlin 文件
-括号/圆括号/方括号平衡、81 个 `R.string` 引用全部有定义、9 个新符号在每个使用处都有 import
-（含通配符）、**39 处 `RadioDialogOption` 调用点的具名参数全部合法**、
+**离线核验结果**：3 个 strings.xml 格式良好且无重名、新键三处齐全、**23 个 Kotlin 文件**
+（22 main + 1 test）括号/圆括号/方括号平衡、81 个 `R.string` 引用全部有定义、9 个新符号在每个
+使用处都有 import（含通配符）、**39 处 `RadioDialogOption` 调用点的具名参数全部合法**、
 `flowSummaryFonts` 的 6 个注册点齐全、无 `loadWithFallback` / `Slot.fallback` 残留。
-另用 Python 独立复算了 `FontNames` 的解析逻辑（含 **52 种截断全部被正确拒绝**）。
-**注意：本机没有 JDK / Android SDK，编译由 GitHub Actions 完成，所以真正的编译结论要看那三个 job，
-不以上面的静态检查为准。**
+另用 Python 独立复算了 `FontNames` 的解析逻辑：**13 条选取规则全部命中预期**，
+对合成字体做**逐字节截断共 129 个前缀**，无一抛异常、无一返回伪造名字；另验了表长度撒谎、
+表名被改、WOFF 容器三种拒绝路径。
+
+**CI 结论（2026-10-06）**：commit `5d7058b2`（26 files, +1175/−135）推送后，三个 workflow
+**全绿**——`Build Commit`（run 37460020715，跑的是 `assembleGithubRelease`，这是真正的编译证据）、
+`Unit Tests (on push)`（run 37460020647，其中"字体基线守卫确实跑了"那一步通过，说明
+`ListFontBaselineTest` 没被 skip）、`Fork Auto Release (on push)`（run 37460020716）。
+产出 **`v0.16.2-tablet.16`**。**本机没有 JDK / Android SDK，编译结论以这三个 job 为准，
+不以静态检查为准**——静态检查只能挡住笔误，挡不住 API 不存在、类型不匹配、Compose 约束违规。
+
+**本轮的一个方法论教训**：Python 交叉校验脚本**自己也会错**，而且错起来长得很像"被测代码全错"。
+第一次跑，13 条选取规则**全部报 None**，看上去像解析器彻底坏了；实际是脚本三处错：
+sfnt 偏移表少写一个 `H`（10 字节而非 12 字节）→ 表记录起点错 2 字节；ttcf 头用 `>IHHI` 装
+`0x00010000` → `struct.error`；**最关键的是 ttcf 内的表记录偏移按"相对内嵌字体"写，而 OpenType
+规定 TTC 内部是相对文件起点**。修好脚本后全绿。**判据：交叉校验"全红"时先怀疑测试台，
+别先改被测代码**——尤其当被测代码是纯函数、且本地单测（`FontNamesTest.kt` 里的 Kotlin
+构建器）本来就是对的。
+
+**顺带修掉的一个弱测试**：`the requested language wins over the other one` 原本两条记录
+用**同一个字符串**（`"Source Han Serif SC"`），无论选哪条断言都成立 → **这条测试不可能失败**。
+改为两条记录文本不同、并把 zh-CN 放在文件更靠前的位置，这样"按语言选"和"按文件顺序选"
+才能被区分开。
 
