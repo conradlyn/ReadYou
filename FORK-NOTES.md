@@ -1457,3 +1457,81 @@ val composer = TextComposer(paragraphIndent = x) { ... }       // ❌ 末位已�
 - [ ] `Content.kt` 里 `paragraphIndentEnabled` / `isChinese` 是否仍由**同一个**判定驱动两处透传。
 - [ ] `ReadingParagraphIndentPreference` 的 6 处注册（§2.6）。
 
+### 9.14 单源视图不再重复源图标（2026-10-06，第九轮）
+
+需求：信息流每篇文章左边的订阅源图标也不需要，可以自动隐藏。
+（承接 §9.12 —— 那里去掉的是每行上方的源**名**，这里去掉的是源**图标**。）
+
+#### 结论：与源名同一条规则
+
+单源视图（`feedScoped && !groupScoped`）里所有文章同源，图标逐行重复，不携带任何信息 → 不画。
+「全部」/ 文件夹 / 星标 / 搜索视图保留 —— 那里图标是**一眼分辨来源**的最快线索，
+而且它是「订阅源名称」开关关掉之后**唯一**还剩的来源标识。
+
+设置里既有的「订阅源图标」开关继续管多源视图；和源名一样，它**不能再**把图标叫回单源视图。
+
+#### 关键：图标不是自包含的，它拖动了三处对齐
+
+这是本轮最容易做错的地方。隐藏图标**不能只删掉那次 `FeedIcon` 调用** ——
+另外三处测量值是**为它预留空间**的，任何一处漏改都会在标题前面留一个 30dp 的空洞：
+
+| 位置 | 有图标 | 无图标 | 数值来源 |
+|---|---|---|---|
+| `ArticleItem` 顶部行，源名分支的 `start` | `adaptiveSize(30.dp)` | `0.dp` | 图标 20 + 间距 10 = 30 |
+| `ArticleItem` 顶部行，无源名分支的 `Spacer` | `30.dp` | `0.dp` | 同上 |
+| `StickyHeader` 日期文字缩进 | `54.dp` | `24.dp` | 24 边距 + 30 |
+| `FlowPage` 顶栏大标题缩进 | `34.dp` | `8.dp` | 上游 `a2335f49` 引入 |
+
+**上游本来就是这么设计的**：`StickyHeader`（`66094f80`）与 `FlowPage`（`a2335f49`）都把缩进
+绑在同一个偏好上，`ArticleItem` 的 30dp 由本 fork 改成自适应（`95f715c3`）。
+所以正确的做法不是"改这几处"，而是**让它们读同一个判定**。
+
+#### 实现（96 增 / 6 删，零重排）
+
+- `ArticleFeedName.kt`：新增 `shouldShowArticleFeedIcon(preferenceEnabled, singleFeedFlow)`，
+  与 `shouldShowArticleFeedName` 同规则。**做成函数而不是三份内联表达式**，
+  理由就是上表 —— 四处必须永远给同一个答案。
+- `ArticleItem.kt`：新增 `val showFeedIcon = shouldShowArticleFeedIcon(...)`，
+  上面三处（2 个预留 + 1 次绘制）改读它。**4 处改动，`articleListFeedIcon.value` 归零**
+  （仅剩新声明里的实参）。
+- `FlowPage.kt`：同样新增 `showFeedIcon`，供**行外**的两处消费：
+  顶栏大标题缩进、以及传给 `ArticleList` 的 `isShowFeedIcon`（后者再传给 `StickyHeader`）。
+- `ArticleList.kt` / `StickyHeader.kt`：**未改动** —— 它们的参数名 `isShowFeedIcon`
+  本来就准确，只是现在收到的是计算后的判定。
+- `ArticleFeedNameTest.kt`：+6 个用例（7 → 13）。
+
+#### 为什么 `FlowPage` 要自己算一遍（而不是从 `ArticleItem` 传上来）
+
+`ArticleItem` 直接读 `LocalFlowArticleListFeedIcon`，`FlowPage` 也读同一个 Local。
+两处各自调用**同一个纯函数**、喂同样的两个输入，因此不可能分叉 ——
+这与 §9.12 警告的"把表达式内联写两遍"是两回事。真正要避免的是**两份规则**，不是两次调用。
+
+#### 刻意没做
+
+- **没改偏好默认值**。`FlowArticleListFeedIconPreference.default` 仍是 `ON`；
+  单源视图的隐藏由规则决定，不靠改默认值。这样「全部」视图的图标不受影响。
+- **没动 `ArticleList` / `StickyHeader` 的参数名**。改名会波及三个文件，收益只是措辞。
+- **没给 `BoldCharactersPage` 的预览加图标逻辑**。那里不画文章行。
+
+#### 离线核验结果（本机无 JDK，编译只能由 CI 证实）
+
+- 5 个相关文件括号平衡全过
+- **完整性判据**：替换前 `articleListFeedIcon.value` 在 `ArticleItem.kt` 出现 3 次、
+  `FlowPage.kt` 出现 2 次，与计划替换的数量**完全吻合**；替换后各归零（只剩新声明的实参）
+- `assert --contains` 按文件分别跑，4 个文件共 10 条声明全在
+- **反向断言**：两文件里 `articleListFeedIcon.value` **只**出现在 `shouldShowArticleFeedIcon(` 的实参位置，
+  没有残留的"直接读偏好做缩进"
+- `imports --watch`：三个符号全部判定为 **same package**
+- **独立复算**：Python 重写真值表，与 13 个用例的期望值逐条一致
+- **尾随 lambda 闸门**（§3.6）：0 条 —— 本轮没有给任何函数追加参数
+- 新增 6 个用例**逐个检查过"能不能变红"**：把规则误写成 `preferenceEnabled` 一条，
+  会且只会被 `the icon is never drawn in a single-feed flow` 抓住
+
+#### 上游同步后要核验的
+
+- [ ] `StickyHeader` 的 `isShowFeedIcon` 是否仍用于 `54.dp / 24.dp` 的缩进分支。
+- [ ] `FlowPage` 顶栏大标题是否仍按 `34.dp / 8.dp` 分支缩进。
+- [ ] `ArticleItem` 顶部行的两处 30dp 预留是否仍与图标绘制同进同退。
+- [ ] `ArticleItem` / `FlowPage` 是否仍从**同一个** `shouldShowArticleFeedIcon` 取值。
+- [ ] `FeedIcon` 的默认尺寸（20dp）与间距（10dp）之和是否仍等于预留的 30dp。
+      上游改图标尺寸时，`StickyHeader` 的 54dp 会被一起带偏。

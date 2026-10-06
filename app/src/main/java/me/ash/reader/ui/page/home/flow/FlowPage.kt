@@ -174,6 +174,11 @@ fun FlowPage(
     // case, and only in that case - see `ArticleFeedName.kt` for why the two must agree.
     val isSingleFeed = isSingleFeedFlow(filterUiState.group != null, filterUiState.feed != null)
 
+    // The rows' own icon decision, repeated here because two things outside the rows reserve
+    // space for that icon: the sticky date header, and this page's large title. They have to
+    // give the same answer as the rows, or one of them indents for an icon nobody draws.
+    val showFeedIcon = shouldShowArticleFeedIcon(articleListFeedIcon.value, isSingleFeed)
+
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     var markAsRead by remember { mutableStateOf(false) }
@@ -410,7 +415,7 @@ fun FlowPage(
                                 BasicText(
                                     modifier =
                                         Modifier.padding(
-                                            start = if (articleListFeedIcon.value) 34.dp else 8.dp,
+                                            start = if (showFeedIcon) 34.dp else 8.dp,
                                             end = 24.dp,
                                         ),
                                     text = titleText,
@@ -733,7 +738,7 @@ fun FlowPage(
                             ArticleList(
                                 pagingItems = pagingItems,
                                 diffMap = viewModel.diffMapHolder.diffMap,
-                                isShowFeedIcon = articleListFeedIcon.value,
+                                isShowFeedIcon = showFeedIcon,
                                 isShowStickyHeader = articleListDateStickyHeader.value,
                                 isSingleFeed = isSingleFeed,
                                 articleListTonalElevation = articleListTonalElevation.value,

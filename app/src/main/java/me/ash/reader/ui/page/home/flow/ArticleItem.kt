@@ -144,6 +144,11 @@ fun ArticleItem(
     // title row would drift apart and print the timestamp twice.
     val showFeedName = shouldShowArticleFeedName(articleListFeedName.value, isSingleFeed)
 
+    // The same shape one row lower. The icon has three alignment consequences - two reserves
+    // in the top line and the icon itself in the bottom line - and they have to agree, or the
+    // title ends up indented for an icon that is not drawn.
+    val showFeedIcon = shouldShowArticleFeedIcon(articleListFeedIcon.value, isSingleFeed)
+
     Column(
         modifier =
             modifier
@@ -178,7 +183,7 @@ fun ArticleItem(
                         Modifier.weight(1f)
                             .padding(
                                 start =
-                                    if (articleListFeedIcon.value) adaptiveSize(30.dp) else 0.dp,
+                                    if (showFeedIcon) adaptiveSize(30.dp) else 0.dp,
                                 end = adaptiveSize(10.dp),
                             ),
                     text = feedName,
@@ -206,7 +211,7 @@ fun ArticleItem(
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(Modifier.width(if (articleListFeedIcon.value) 30.dp else 0.dp))
+                    Spacer(Modifier.width(if (showFeedIcon) 30.dp else 0.dp))
 
                     if (articleListDate.value) {
                         // Time
@@ -231,7 +236,7 @@ fun ArticleItem(
         // Bottom
         Row(modifier = Modifier.fillMaxWidth().padding(top = adaptiveSize(4.dp))) {
             // Feed icon
-            if (articleListFeedIcon.value) {
+            if (showFeedIcon) {
                 FeedIcon(feedName = feedName, iconUrl = feedIconUrl)
                 Spacer(modifier = Modifier.width(adaptiveSize(10.dp)))
             }

@@ -29,3 +29,25 @@ fun isSingleFeedFlow(groupScoped: Boolean, feedScoped: Boolean): Boolean = feedS
  */
 fun shouldShowArticleFeedName(preferenceEnabled: Boolean, singleFeedFlow: Boolean): Boolean =
     preferenceEnabled && !singleFeedFlow
+
+/**
+ * Whether an article row should draw the icon of the feed it belongs to.
+ *
+ * Same rule as [shouldShowArticleFeedName], for the same reason: in a single-feed flow every row
+ * would draw the identical icon, so it says nothing about the article it sits beside.
+ *
+ * It is also the more expensive of the two to get half-right. The icon drags three other
+ * measurements along with it - two reserves in the row's top line, and the sticky date header's own
+ * indent - so dropping the icon while leaving any of them in place opens a 30dp hole in front of
+ * every title. Keeping them in step is the whole job; that is why this is a function rather than
+ * three inline copies of the same expression.
+ *
+ * Kept in every multi-source view: there the icon is the fastest way to tell whose article a row
+ * is, and it is the only mark of origin that survives when the "feed names" switch is off.
+ *
+ * [preferenceEnabled] is the user's existing "feed icons" switch. As with the name, it keeps
+ * governing the multi-source views and can no longer bring the icon back in a single-feed flow,
+ * where it would only repeat the top bar.
+ */
+fun shouldShowArticleFeedIcon(preferenceEnabled: Boolean, singleFeedFlow: Boolean): Boolean =
+    preferenceEnabled && !singleFeedFlow
