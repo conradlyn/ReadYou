@@ -23,6 +23,14 @@ on:
     paths-ignore:
       - "**/*.md"
   workflow_dispatch:
+    inputs:
+      # Push-triggered runs always publish a pre-release. Uncheck this on a manual run to publish a
+      # normal release instead - that is how the tablet line graduates out of pre-release, and it
+      # needs no edit to this file and no local token.
+      prerelease:
+        description: "Publish as a pre-release"
+        type: boolean
+        default: true
 
 # Needed to create the tag ref and the release. Least privilege beyond that.
 permissions:
@@ -64,9 +72,22 @@ jobs:
       - name: Cut a tag and publish the APK
         env:
           GH_TOKEN: ${{ github.token }}
+          # Empty on a push-triggered run (the `inputs` context has no value there), so the default
+          # below applies. Only a manual run can set it to "false".
+          PRERELEASE_INPUT: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
           shopt -s nullglob
+
+          # A manual run that unchecks the box publishes a normal release; everything else stays a
+          # pre-release. Kept as a flag rather than two `gh release create` calls so the release
+          # notes and the assets cannot drift between the two paths.
+          if [ "${PRERELEASE_INPUT:-true}" = "false" ]; then
+            echo "publishing a normal release"
+            prerelease_flag=""
+          else
+            prerelease_flag="--prerelease"
+          fi
 
           apks=(app/build/outputs/apk/github/release/*.apk)
           if [ ${#apks[@]} -eq 0 ]; then
@@ -125,10 +146,11 @@ jobs:
           notes="${notes}"$'\n\n'"Signed with the debug keystore committed at \`signature/reader.keystore\`,"
           notes="${notes}"$'\n'"so it will not install over an F-Droid or Google Play build. Uninstall those first."
 
+          # `$prerelease_flag` is deliberately unquoted: empty must expand to no argument at all.
           gh release create "$tag" "${apks[@]}" \
             --verify-tag \
             --title "$tag" \
-            --prerelease \
+            $prerelease_flag \
             --notes "$notes"
 
           {
