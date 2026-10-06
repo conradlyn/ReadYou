@@ -32,7 +32,10 @@ fun StickyHeader(
         Text(
             modifier = Modifier
                 .padding(
-                    start = if (isShowFeedIcon) 54.dp else 24.dp,
+                    // Was `54.dp / 24.dp`, which is the same distance on a phone and 3.6dp short of
+                    // the rows on a tablet - see `FlowListInset.kt`. The date has to sit directly
+                    // over the article it dates, so it reads the same value they do.
+                    start = flowListTextInset(isShowFeedIcon),
                 )
                 .padding(top = 8.dp, bottom = 4.dp),
             text = dateString,

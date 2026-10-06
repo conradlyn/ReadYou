@@ -95,6 +95,7 @@ import me.ash.reader.infrastructure.preference.MarkAsReadButtonPositionPreferenc
 import me.ash.reader.infrastructure.preference.PullToLoadNextFeedPreference
 import me.ash.reader.infrastructure.preference.SortUnreadArticlesPreference
 import me.ash.reader.ui.adaptive.adaptiveSize
+import me.ash.reader.ui.adaptive.rememberAdaptiveContentGutter
 import me.ash.reader.ui.component.FilterBar
 import me.ash.reader.ui.component.base.FeedbackIconButton
 import me.ash.reader.ui.component.base.RYExtensibleVisibility
@@ -383,6 +384,12 @@ fun FlowPage(
         RYScaffold(
             containerTonalElevation = articleListTonalElevation.value.dp,
             topBar = {
+                // The list this bar titles is centred by `RYScaffold`'s content gutter; the bar
+                // itself is not, because shrinking it would take away the tap-anywhere-to-scroll
+                // target. So the gutter is added to the title's own inset instead, and the title
+                // ends up on the list's text rather than on the window's edge - which on a tablet
+                // is the difference between a title 24dp in and one 80dp short of its own list.
+                val adaptiveGutter = rememberAdaptiveContentGutter()
                 MaterialTheme(
                     colorScheme = MaterialTheme.colorScheme,
                     typography =
@@ -415,7 +422,16 @@ fun FlowPage(
                                 BasicText(
                                     modifier =
                                         Modifier.padding(
-                                            start = if (showFeedIcon) 34.dp else 8.dp,
+                                            // Upstream's `34.dp / 8.dp`, derived instead of
+                                            // hand-tuned: those two are the list's inset less this
+                                            // bar's own 16dp title origin, and upstream's `34.dp`
+                                            // is 4dp short of the reserve the rows actually make.
+                                            // See `FlowListInset.kt`.
+                                            start =
+                                                flowTitleStartPadding(
+                                                    adaptiveGutter,
+                                                    showFeedIcon,
+                                                ),
                                             end = 24.dp,
                                         ),
                                     text = titleText,

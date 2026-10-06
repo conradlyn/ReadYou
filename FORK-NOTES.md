@@ -1482,6 +1482,10 @@ val composer = TextComposer(paragraphIndent = x) { ... }       // ❌ 末位已�
 | `StickyHeader` 日期文字缩进 | `54.dp` | `24.dp` | 24 边距 + 30 |
 | `FlowPage` 顶栏大标题缩进 | `34.dp` | `8.dp` | 上游 `a2335f49` 引入 |
 
+> **本表已被 §9.15 取代。** 那一轮只统一了「要不要画图标」这个**判定**，
+> 表里四处仍各自写着**字面量**；§9.15 把「文字左边缘在哪里」也收成一处。
+> 留在这里是因为它是 §9.14 的现场记录 —— 读的时候请连同 §9.15 一起看。
+
 **上游本来就是这么设计的**：`StickyHeader`（`66094f80`）与 `FlowPage`（`a2335f49`）都把缩进
 绑在同一个偏好上，`ArticleItem` 的 30dp 由本 fork 改成自适应（`95f715c3`）。
 所以正确的做法不是"改这几处"，而是**让它们读同一个判定**。
@@ -1537,8 +1541,139 @@ val composer = TextComposer(paragraphIndent = x) { ... }       // ❌ 末位已�
 #### 上游同步后要核验的
 
 - [ ] `StickyHeader` 的 `isShowFeedIcon` 是否仍用于 `54.dp / 24.dp` 的缩进分支。
+      （§9.15 之后：这一处已改为 `flowListTextInset(isShowFeedIcon)`，该条目随之失效。）
 - [ ] `FlowPage` 顶栏大标题是否仍按 `34.dp / 8.dp` 分支缩进。
+      （§9.15 之后：同上，已改为 `flowTitleStartPadding(...)`。）
 - [ ] `ArticleItem` 顶部行的两处 30dp 预留是否仍与图标绘制同进同退。
 - [ ] `ArticleItem` / `FlowPage` 是否仍从**同一个** `shouldShowArticleFeedIcon` 取值。
 - [ ] `FeedIcon` 的默认尺寸（20dp）与间距（10dp）之和是否仍等于预留的 30dp。
       上游改图标尺寸时，`StickyHeader` 的 54dp 会被一起带偏。
+
+### 9.15 顶栏大标题与下方列表左对齐（2026-10-06，第十轮）
+
+需求（用户原话）：**「把大标题左侧与下方的列表的左侧对齐。这样视觉上更加的美观。」**
+
+上一轮（§9.14）把「顶栏大标题缩进」和列表的图标预留绑在了**同一个判定**上，但四处仍各自写着
+**字面量**：`34.dp / 8.dp`、`54.dp / 24.dp`、`30.dp`。这一轮把「文字左边缘在哪里」也收成一处。
+
+#### 先纠正一个错误的理解：`34.dp / 8.dp` 不是「跟着图标收窄」，而是「对齐列表」
+
+上游 `a2335f49` 引入时是**文字缩进**，不是布局内边距：
+
+```kotlin
+val indent = with(LocalDensity.current) { (if (articleListFeedIcon.value) 34.dp else 8.dp).toSp() }
+typography = MaterialTheme.typography.copy(
+    headlineMedium = MaterialTheme.typography.displaySmall.merge(textIndent = TextIndent(indent)),
+)
+```
+
+`68eb0557` 改成 `BasicText` + `Modifier.padding(start = ...)` 时值照抄了。两者**视觉等价**
+（`TextIndent` 只移动首行，`padding` 移动整个节点；标题最多两行，看不出区别）。
+
+关键在 `8.dp` 这个数：**8 + 16 = 24，正好等于列表文字的左边距**（`ArticleItem` 两段
+`adaptiveSize(12.dp)`）。所以上游的意图本来就是"和列表对齐"。
+而 `34.dp` 是**手调出来的**：`34 + 16 = 50`，但列表在有图标时是 `24 + 30 = 54` —— 差 4dp。
+上游两个数之间的差是 26，列表两个状态之间的差是 30。**所以 `34.dp` 是错的，正确值是 38。**
+
+#### 关键未知量：Material 3 的标题槽起点 = 16dp（不是猜的）
+
+对齐必须先知道「标题槽自己已经从栏左边进来了多少」。查的是 material3 **1.4.0** 的源码
+（`material3-android-1.4.0-sources.jar`，`commonMain/androidx/compose/material3/AppBar.kt`）：
+
+```kotlin
+private val TopAppBarHorizontalPadding = 4.dp
+private val TopAppBarTitleInset = 16.dp - TopAppBarHorizontalPadding      // = 12.dp
+```
+
+- 两行式顶栏（`LargeTopAppBar` / `MediumTopAppBar`）是**上下两个** `TopAppBarLayout` 的 `Column`；
+- **下面那一行**（画大标题的那行）传的是 `navigationIcon = {}`、`actions = {}`（`AppBar.kt` 2848/2849）；
+- 于是 `start = max(TopAppBarTitleInset, navIconWidth) = max(12dp, 4dp) = 12dp`，
+  再加标题槽自身的 `padding(horizontal = 4.dp)` → **标题内容起点 = 16dp**；
+- 上面那一行（收起来的窄标题）传的是真的 `navigationIcon`，48dp 按钮 + 4dp 内边距 → 起点 56dp。
+  所以折叠过程中标题会**横移** —— 这是 M3 的设计，靠 `topTitleAlpha` / `bottomTitleAlpha`
+  交叉淡入淡出而不是动画，本次不动它。
+
+> 这两个常量是 `private`，不是 API。将来漂移的后果是标题偏几个 dp，不会崩也不会裁切；
+> 而 `FlowListInsetTest` 会在有人改 `FlowTitleOriginInLargeTopAppBar` 时先红。
+
+#### 另一个关键量：`RYScaffold` 的居中留白
+
+`RYScaffold` 把 `content` 槽按 `gutter` 缩进（`AdaptiveContentMaxWidth = 640.dp` 居中），
+但**显式 `topBar` 不缩进** —— 这是 `RYScaffold` 里写明的取舍（缩了就没法整条栏点击回顶部）。
+`FeedsPage` 早就用 `rememberAdaptiveContentGutter()` 把两个图标补上了，**FlowPage 的大标题没有**。
+平板竖屏（~800dp）gutter = 80dp，所以标题贴着窗口边、列表却在 80dp 处 —— 这是肉眼最明显的那一段。
+
+#### 实现（3 个既有文件 35 增 / 10 删，另新增 2 个文件共 220 行）
+
+新增 `ui/page/home/flow/FlowListInset.kt`（**新文件，上游不会碰**）：
+
+| 成员 | 作用 |
+|---|---|
+| `FlowRowHorizontalPadding = 12.dp` | 行内两段水平内边距 |
+| `FlowIconReserve = 30.dp` | 图标 20 + 间距 10 |
+| `flowListTextInset(scale, showFeedIcon)` | 纯函数：列表文字左边距 |
+| `flowListTextInset(showFeedIcon)` | `@Composable` 重载 |
+| `FlowTitleOriginInLargeTopAppBar = 16.dp` | **private**，M3 标题槽起点 |
+| `flowTitleStartPadding(gutter, textInset)` | **internal** 纯函数，供单测 |
+| `flowTitleStartPadding(gutter, showFeedIcon)` | `@Composable` 重载 |
+
+「纯函数 + `@Composable` 重载」这个形状**照抄 `adaptiveContentGutter` / `rememberAdaptiveContentGutter`**，
+目的同样是让算术能在普通 JVM 上被单测钉住。
+
+- `ArticleItem.kt`：新增 `val iconReserve = if (showFeedIcon) adaptiveSize(FlowIconReserve) else 0.dp`，
+  顶部行两处预留改读它（顺带**修掉一个平板上的真 bug**：无源名分支原来是裸 `30.dp`，
+  而下面画的图标是 `adaptiveSize(20) + adaptiveSize(10) = 34.5dp`，差 4.5dp）；
+  两段水平内边距改用 `FlowRowHorizontalPadding`（垂直那段**故意留着字面量** ——
+  它不参与左边缘链，绑在一起会让将来调整竖向节奏时悄悄移动每个标题的左边）。
+- `StickyHeader.kt`：`if (isShowFeedIcon) 54.dp else 24.dp` → `flowListTextInset(isShowFeedIcon)`。
+- `FlowPage.kt`：`topBar` 里读 `rememberAdaptiveContentGutter()`，
+  标题的 `start` 改为 `flowTitleStartPadding(adaptiveGutter, showFeedIcon)`。
+
+#### 数值对照（对齐是否真的成立）
+
+| 场景 | 大标题文字 x | 列表文字 x | 日期吸顶头 x |
+|---|---|---|---|
+| 手机 / 无图标 | 16 + 8 = **24** | 24 | 24 |
+| 手机 / 有图标 | 16 + 38 = **54**（原 50） | 54 | 54 |
+| 平板（scale 1.15）/ 无图标 / pane 内 | 16 + 11.6 = **27.6** | 27.6 | 27.6 |
+| 平板（scale 1.15）/ 有图标 | 16 + 46.1 = **62.1** | 62.1 | 62.1 |
+| 平板单栏（gutter 80）/ 无图标 | 16 + 91.6 = **107.6** | 80 + 27.6 = 107.6 | 同 |
+
+**手机上的唯一行为变化**：多源视图里标题从 50dp 移到 54dp（`34 → 38`）。
+这是刻意的 —— 上游那个 `34.dp` 与列表对不齐。除此之外手机上每一处都仍与上游逐字节一致
+（`scale = 1f` 时 `flowListTextInset` 回到 `24 / 54`，`iconReserve` 回到 `30`）。
+
+#### 刻意没做
+
+- **没动折叠态的窄标题**（它在返回箭头右侧 56dp 处，是 M3 的设计，不是错位）。
+- **没给 `navigationIcon` / `actions` 补 gutter**。`FeedsPage` 补了，但 Flow 页的 pane 目前
+  < 640dp（§164 已核验），gutter 恒为 0，补了是纯增 diff。**若上游把 pane 加宽到 ≥640dp，
+  这两处也要补**，否则标题会离开返回箭头 80dp —— 届时照 `FeedsPage` 的写法用 `Box` 裹住
+  （不能把 padding 加在 `FeedbackIconButton` 的 `modifier` 上，见 §2.5）。
+- **没动标题的 `end = 24.dp`**。它不参与左对齐。
+
+#### 离线核验结果（本机无 JDK，编译只能由 CI 证实）
+
+- 5 个文件括号平衡全过
+- `assert --contains` 按文件分别跑，共 25 条声明全在
+- `imports --watch`：4 个新符号判 `same package` / `declared here`，
+  `rememberAdaptiveContentGutter` 判 `explicit import`
+- **反向断言**：`34.dp` / `8.dp` / `54.dp` / `24.dp` 在 FlowPage、StickyHeader 里
+  **只剩注释**；`ArticleItem` 里再无裸 `30.dp`
+- **尾随 lambda 闸门**（§3.6）：0 条
+- **独立复算**：Python 从 12 / 12 / 30 / 16 四个源常量重算 12 个断言值与 3 条比例关系，
+  与 `FlowListInsetTest` 的期望值逐条一致；并算出上表「标题 x = 列表 x」逐行相等
+- 新增 6 个用例逐个检查过"能不能变红"：把 `FlowTitleOriginInLargeTopAppBar` 改成 `12.dp`，
+  会且只会被 `the title's padding lands the title on the list's text` 抓住
+
+#### 上游同步后要核验的
+
+- [ ] `FlowListInset.kt` 是否仍在（新文件，上游不会新增同名文件）。
+- [ ] `ArticleItem` 的两段水平内边距是否仍是 `adaptiveSize(FlowRowHorizontalPadding)`；
+      上游若改了 12dp，`FlowRowHorizontalPadding` 要跟着改。
+- [ ] `FeedIcon` 默认尺寸与旁边 `Spacer` 之和是否仍等于 `FlowIconReserve`（20 + 10 = 30）。
+- [ ] `StickyHeader` 是否仍读 `flowListTextInset`，而不是回到 `54.dp / 24.dp`。
+- [ ] `FlowPage` 标题的 `start` 是否仍是 `flowTitleStartPadding(...)`。
+- [ ] **material3 的 `TopAppBarTitleInset` / `TopAppBarHorizontalPadding` 是否仍是 12dp / 4dp。**
+      判据：下载 `material3-android-<版本>-sources.jar`，在 `AppBar.kt` 里搜这两个名字。
+      改了就把 `FlowTitleOriginInLargeTopAppBar` 改成 `TitleInset + HorizontalPadding`。

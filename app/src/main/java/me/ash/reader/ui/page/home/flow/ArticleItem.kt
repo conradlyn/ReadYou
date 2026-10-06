@@ -149,13 +149,23 @@ fun ArticleItem(
     // title ends up indented for an icon that is not drawn.
     val showFeedIcon = shouldShowArticleFeedIcon(articleListFeedIcon.value, isSingleFeed)
 
+    // The width the top line has to leave empty when the bottom line draws that icon. One value,
+    // read by both, because they are two halves of one column - and because the two used to
+    // disagree: the feed-name branch scaled it, the branch below wrote a bare `30.dp`. That is
+    // right on a phone and 4.5dp short on a tablet, where the icon and the gap after it are both
+    // scaled and the top line is not.
+    val iconReserve = if (showFeedIcon) adaptiveSize(FlowIconReserve) else 0.dp
+
     Column(
         modifier =
             modifier
-                .padding(horizontal = adaptiveSize(12.dp))
+                .padding(horizontal = adaptiveSize(FlowRowHorizontalPadding))
                 .clip(Shape20)
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                .padding(horizontal = adaptiveSize(12.dp), vertical = adaptiveSize(12.dp))
+                .padding(
+                    horizontal = adaptiveSize(FlowRowHorizontalPadding),
+                    vertical = adaptiveSize(12.dp),
+                )
                 .alpha(
                     when (articleListReadIndicator) {
                         FlowArticleReadIndicatorPreference.None -> 1f
@@ -181,11 +191,7 @@ fun ArticleItem(
                 Text(
                     modifier =
                         Modifier.weight(1f)
-                            .padding(
-                                start =
-                                    if (showFeedIcon) adaptiveSize(30.dp) else 0.dp,
-                                end = adaptiveSize(10.dp),
-                            ),
+                            .padding(start = iconReserve, end = adaptiveSize(10.dp)),
                     text = feedName,
                     color = MaterialTheme.colorScheme.tertiary,
                     style = MaterialTheme.typography.labelMedium.withFlowListStyle(),
@@ -211,7 +217,7 @@ fun ArticleItem(
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(Modifier.width(if (showFeedIcon) 30.dp else 0.dp))
+                    Spacer(Modifier.width(iconReserve))
 
                     if (articleListDate.value) {
                         // Time
