@@ -25,6 +25,7 @@ fun LazyListScope.ArticleList(
     isShowFeedIcon: Boolean,
     isShowStickyHeader: Boolean,
     articleListTonalElevation: Int,
+    isSingleFeed: Boolean = false,
     isSwipeEnabled: () -> Boolean = { false },
     isMenuEnabled: Boolean = true,
     onClick: (ArticleWithFeed, Int) -> Unit = { _, _ -> },
@@ -49,6 +50,7 @@ fun LazyListScope.ArticleList(
                     SwipeableArticleItem(
                         articleWithFeed = item.articleWithFeed,
                         isUnread = rememberIsUnread(diffMap, article),
+                        isSingleFeed = isSingleFeed,
                         articleListTonalElevation = articleListTonalElevation,
                         onClick = { onClick(it, index) },
                         isSwipeEnabled = isSwipeEnabled,
@@ -83,6 +85,7 @@ fun LazyListScope.ArticleList(
                         SwipeableArticleItem(
                             articleWithFeed = item.articleWithFeed,
                             isUnread = rememberIsUnread(diffMap, article),
+                            isSingleFeed = isSingleFeed,
                             articleListTonalElevation = articleListTonalElevation,
                             onClick = { onClick(it, index) },
                             isSwipeEnabled = isSwipeEnabled,

@@ -169,6 +169,11 @@ fun FlowPage(
             else -> filterUiState.filter.toName()
         }
 
+    // Mirrors `titleText` directly above: the top bar names a single feed exactly when the page is
+    // feed-scoped and not group-scoped. The article rows drop their own copy of that name in that
+    // case, and only in that case - see `ArticleFeedName.kt` for why the two must agree.
+    val isSingleFeed = isSingleFeedFlow(filterUiState.group != null, filterUiState.feed != null)
+
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     var markAsRead by remember { mutableStateOf(false) }
@@ -730,6 +735,7 @@ fun FlowPage(
                                 diffMap = viewModel.diffMapHolder.diffMap,
                                 isShowFeedIcon = articleListFeedIcon.value,
                                 isShowStickyHeader = articleListDateStickyHeader.value,
+                                isSingleFeed = isSingleFeed,
                                 articleListTonalElevation = articleListTonalElevation.value,
                                 isSwipeEnabled = { listState.isScrollInProgress },
                                 onClick = { articleWithFeed, index ->

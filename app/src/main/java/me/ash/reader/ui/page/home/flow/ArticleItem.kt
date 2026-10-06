@@ -94,6 +94,7 @@ fun ArticleItem(
     modifier: Modifier = Modifier,
     articleWithFeed: ArticleWithFeed,
     isUnread: Boolean = articleWithFeed.article.isUnread,
+    isSingleFeed: Boolean = false,
     onClick: (ArticleWithFeed) -> Unit = {},
     onLongClick: (() -> Unit)? = null,
 ) {
@@ -110,6 +111,7 @@ fun ArticleItem(
         imgData = article.img,
         isStarred = article.isStarred,
         isUnread = isUnread,
+        isSingleFeed = isSingleFeed,
         onClick = { onClick(articleWithFeed) },
         onLongClick = onLongClick,
     )
@@ -127,6 +129,7 @@ fun ArticleItem(
     imgData: Any? = null,
     isStarred: Boolean = false,
     isUnread: Boolean = false,
+    isSingleFeed: Boolean = false,
     onClick: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
 ) {
@@ -136,6 +139,10 @@ fun ArticleItem(
     val articleListDesc = LocalFlowArticleListDesc.current
     val articleListDate = LocalFlowArticleListTime.current
     val articleListReadIndicator = LocalFlowArticleListReadIndicator.current
+
+    // One decision, read by both branches below. Deriving it twice is how the top row and the
+    // title row would drift apart and print the timestamp twice.
+    val showFeedName = shouldShowArticleFeedName(articleListFeedName.value, isSingleFeed)
 
     Column(
         modifier =
@@ -165,7 +172,7 @@ fun ArticleItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Feed name
-            if (articleListFeedName.value) {
+            if (showFeedName) {
                 Text(
                     modifier =
                         Modifier.weight(1f)
@@ -247,7 +254,7 @@ fun ArticleItem(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    if (!articleListFeedName.value && !articleListDate.value) {
+                    if (!showFeedName && !articleListDate.value) {
                         if (isStarred) {
                             StarredIcon()
                         } else {
@@ -320,6 +327,7 @@ private const val SwipeActionDelay = 300L
 fun SwipeableArticleItem(
     articleWithFeed: ArticleWithFeed,
     isUnread: Boolean = articleWithFeed.article.isUnread,
+    isSingleFeed: Boolean = false,
     articleListTonalElevation: Int = 0,
     onClick: (ArticleWithFeed) -> Unit = {},
     isSwipeEnabled: () -> Boolean = { false },
@@ -370,6 +378,7 @@ fun SwipeableArticleItem(
             ArticleItem(
                 articleWithFeed = articleWithFeed,
                 isUnread = isUnread,
+                isSingleFeed = isSingleFeed,
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
