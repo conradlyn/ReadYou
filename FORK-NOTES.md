@@ -1356,8 +1356,8 @@ git 按行合并时那是最强的冲突磁铁。
 - **新增** `infrastructure/preference/ReadingParagraphIndentPreference.kt`（默认 **ON**），
   按 §2.6 的 6 处注册。
 - `reading/Content.kt`：1 处判定 + 2 处透传（`paragraphIndentCss` / `paragraphIndentText`）。
-- `ui/component/reader/TextComposer.kt`：构造参数 `paragraphIndent: String = ""`（**带默认值**，
-  所以代码块那个 composer 一个字都不用改）。
+- `ui/component/reader/TextComposer.kt`：构造参数 `paragraphIndent: String = ""`，
+  **加在 `paragraphEmitter` 之前**。顺序是关键，见下节。
 - `ui/component/reader/HtmlToComposable.kt`：`htmlFormattedText` / `formatBody` 各加一个带默认值的参数；
   `"p"` 分支里加 1 个 `if`。**`appendTextChildren` 的 20 多个递归调用点一处未动** ——
   它本身就是 `TextComposer` 的扩展，`paragraphIndent` 从 `this` 上直接读得到。
@@ -1365,6 +1365,36 @@ git 按行合并时那是最强的冲突磁铁。
   `WebViewStyle.get()` 的 `paragraphIndent` **故意不给默认值** —— 漏接线要变成编译错误，而不是静默失效。
 - `ui/page/settings/color/reading/ReadingTextPage.kt`：正文分区末尾加「首行缩进」开关（带说明「仅对中文文章生效」）。
 - 字符串只补了 `values` / `values-zh-rCN` / `values-zh-rTW` 三份，其余 50 多个语言回落到英文，这是标准回落行为。
+
+#### 一处必须记住的顺序约束（第一次做错了，CI 全红）
+
+`TextComposer` 的 `paragraphIndent` **必须**声明在 `paragraphEmitter` **之前**。
+
+第一次实现时把它追加在了后面（`paragraphEmitter` 在前、`paragraphIndent: String = ""` 在后），
+理由写的是"带默认值，所以代码块那个 composer 一个字都不用改"。**这个理由是错的。**
+
+Kotlin 只在**最后一个参数**是函数类型时，才允许把 lambda 写到括号外：
+
+> "If the last parameter in a function declaration has a functional type, you can pass the
+> corresponding lambda argument either as a named argument or outside the parentheses."
+
+尾随 lambda 永远绑**末位**参数，不会去绑"第一个恰好是函数类型的参数"。**默认值救不了它。**
+于是两处调用点全部失效：
+
+```kotlin
+val composer = TextComposer { paragraphBuilder -> ... }        // ❌ lambda 落到 paragraphIndent 上
+val composer = TextComposer(paragraphIndent = x) { ... }       // ❌ 末位已被命名实参占用
+```
+
+修复方式是把新参数**挪到第一位**，让 `paragraphEmitter` 留在末位 ——
+两处调用点一个字都不用改（`55a09daf..8041aef0`，5 增 1 删）。
+
+**代价**：`77d225d8` 那次 push 的三个 workflow 全红（`Build Commit #40` / `Unit Tests #32` /
+`Fork Auto Release #17`），失败步骤是 `./gradlew assembleGithubRelease`，白烧一轮构建。
+
+**为什么前五类离线断言都看不见它**：括号平衡、声明存在、import 可达性、反向断言、资源校验
+结构上都不检查**参数位置**。这类错误需要一个专门的检查 ——
+已固化为技能 `android-edit-verify-offline` 的 §3.6 与 `check_trailing_lambda.py`。
 
 #### 刻意没做
 
@@ -1387,6 +1417,30 @@ git 按行合并时那是最强的冲突磁铁。
 - **CSS 模板大括号 42/42 平衡**；三个 `strings.xml` 格式良好、无重名键
 - 发布流程：YAML 可解析、`inputs` → `env` → `flag` → `gh release create` 全链路在，
   且**已无硬编码的 `--prerelease` 行**；用 sh 模拟三种入口，判定结果与 §7.6 表格一致
+- **新工具 `check_trailing_lambda.py`（本轮新增，见技能 §3.6）**：双向验证通过 ——
+  把 `TextComposer.kt` 换回修复前版本后，它命中 `class TextComposer` 并列出**两处**
+  无括号尾随 lambda 调用点（`:95` 与 `:149`，比我人工分析多找出一处）；当前仓库 0 条、exit 0
+
+#### CI 结论（2026-10-06）
+
+- **编译通过**：`Build Commit` #41 / #42 均 **Success**（提交 `8041aef0`）。
+  这是 `assembleGithubRelease` 真正编过的证据。
+- **单测通过**：`Unit Tests (on push)` #33 = **Success**（`#34` = Cancelled，见下）。
+- **产出 release**：`Fork Auto Release (on push)` #18 / #19 均 **Success**，
+  产出 `v0.16.2-tablet.18` 与 `v0.16.2-tablet.19`（都是 pre-release）。
+- **对照**：上一次 `77d225d8` 的三个 workflow（#40 / #32 / #17）**全部 Failure**，
+  失败步骤是 `./gradlew assembleGithubRelease`。参数顺序一改，三个一起转绿 ——
+  证实根因就是那一个编译错误，**不是 Gradle 缓存服务抖动**（当时那 6 条
+  `Our services aren't available right now` 注解只是 warning，不是失败原因）。
+
+⚠️ **同一个提交被推了两次**，于是每个 workflow 都跑了两遍，release 也多出 `.18` / `.19` 两个。
+证据：两批 run（`37468109929/943/10010` 与 `37468110301/309/311`）相差约 1 分钟，
+全部 `event=push`、`run_attempt=1`；而 `fork-auto-release.yaml` 只配了 `branches: [main]`，
+且本文件注释已说明「用 `GITHUB_TOKEN` 推的 tag **不会**再触发其他 workflow」，
+所以「tag 推送连锁触发」这条路径可以排除。
+怀疑对象是本机执行环境：**被沙箱拒绝后升级重跑的命令，可能真的执行了两次**。
+**推论：本机跑 `git push` 这类有副作用的命令前，先确认它不会被升级重跑 —— 重复推送 = 重复 release。**
+清理办法：在网页上删掉多余的 `.18`（或 `.19`）即可。
 
 #### 上游同步后要核验的
 
@@ -1394,6 +1448,8 @@ git 按行合并时那是最强的冲突磁铁。
       上游若把段落处理挪走或新增一个段落分支，缩进会静默消失。
 - [ ] `TextComposer` 的 `paragraphEmitter` 是否仍被 `p`/`h1..h6`/`li`/`blockquote` **共用**。
       这决定了"缩进只加在 `p` 上"这个前提是否还成立。
+- [ ] `TextComposer` 的 `paragraphIndent` 是否仍声明在 `paragraphEmitter` **之前**。
+      放到后面会让**所有**无括号尾随 lambda 调用点编译失败（见上节）。
 - [ ] `Reader` / `htmlFormattedText` / `formatBody` 的 `paragraphIndent` 参数是否仍被透传。
       三个都带默认值，**漏传不会报错，只会静默不缩进**。
 - [ ] `WebViewStyle.get()` 的 `paragraphIndent` 是否仍**没有**默认值（这是防漏接线的唯一手段）。
