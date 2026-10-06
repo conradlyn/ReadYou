@@ -38,6 +38,7 @@
 | 字体对话框末行的「导入字体」 | `ui/component/FontImport.kt` 的 `importFontOption()` + `RadioDialogOption.dismissOnClick` | 7 个字体对话框共用**一处**实现；点击**不关闭**对话框，否则导入后的字体名看不见，见 §9.11 |
 | 平板触控目标 | `ui/adaptive/AdaptiveSizing.kt` 的 `Modifier.adaptiveIconButtonContainer()` + 2 个调用点 | **手机档一个尺寸都不传**；传了会把 48dp 压小，见 §2.2 / §9.8 |
 | 列表行高与内边距 | `GroupItem.kt`(5) / `FeedItem.kt`(4) / `ArticleItem.kt`(10) 处内边距，各包一层 `adaptiveSize()` | 其中 `ArticleItem` 的 `start = 30.dp` 是给 `FeedIcon` 预留的缩进，属**正确性**而非美观，见 §9.8 |
+| 单源视图不重复源名 | `ui/page/home/flow/ArticleFeedName.kt` 的两个纯函数 + `FlowPage.kt` 1 行推导 + `isSingleFeed` 三处透传（ArticleList → SwipeableArticleItem → ArticleItem） | 只在 `feed != null && group == null` 时隐藏。**零缩进改动**，`ArticleItem` 里两处判断收敛为一个 `showFeedName`，见 §9.12 |
 | 界面字号（设置页） | `ui/page/nav3/SettingsNavEntry.kt` 的 `settingsNavEntry()` + `AppEntry.kt` 19 处调用点 | 只包设置类路由；`Feeds`/`Reading`/`Startup`/`else` 保持裸 `NavEntry`，见 §9.9 |
 | 界面字号（对话框） | `ui/component/base/RYDialog.kt` 一处 `ProvideUiTextScale { … }` | 覆盖全部 22 处对话框；另有 5 处直调 `AlertDialog` 已改走 `RYDialog(visible = true, …)`，见 §9.9 |
 | 界面字号的缩放算术 | `ui/theme/UiTextScale.kt` 的 `scaledTypography()` / `uiTextScaleSp()` | **100% 恒等**（返回同一个 `Typography` 实例）；`Typography.copy` 的 30 槽位必须显式传，见 §2.2 / §9.9 |
@@ -48,6 +49,7 @@
 `ui/component/ListFonts.kt`、`ui/component/FontImport.kt`、
 `ui/ext/ListExternalFonts.kt`、`ui/ext/FontNames.kt`、
 `ui/theme/UiTextScale.kt`、`ui/page/nav3/SettingsNavEntry.kt`、
+`ui/page/home/flow/ArticleFeedName.kt`、
 `infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
 `ListFontsPreference.kt`、`MarkAsReadButtonPositionPreference.kt`、
 `MarkAllAsReadWithoutConfirmPreference.kt`、`TitleFontsPreference.kt`、
@@ -55,9 +57,9 @@
 `ReadingAutoFullContentPreference.kt`、
 `UiTextScalePreference.kt`、
 `app/src/main/baseline-prof.txt`、四个 workflow、
-8 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
+9 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
 `AdaptiveScaleTest`、`OkHttpClientModuleTest`、`UiTextScaleTest`、`FlowPageLeaveTest`、
-`FontNamesTest`）。
+`FontNamesTest`、`ArticleFeedNameTest`）。
 
 ---
 
@@ -500,9 +502,12 @@ navigationIcon = {
 
 - 仓库是 **public** → Actions 分钟数不计费，`build_commit.yaml` 与 `fork-auto-release.yaml` 各构建一次
   只是多花几分钟墙钟时间，不产生费用。
-- **纯文档提交也会发一个 release**（本工作流的触发条件就是"push 到 main"）。
-  若某天觉得噪音大，给 `on.push` 加 `paths-ignore: ['**/*.md', '.workbuddy/**']` 即可 —— 但那样文档类提交
-  就没有可下载的包了，属取舍。
+- **纯文档提交：不产 release，但照样跑一轮 CI**。`fork-auto-release.yaml` 已加
+  `paths-ignore: ["**/*.md"]`，所以 `FORK-NOTES.md` 这类纯文档 push 不会在 releases 页制造噪音。
+  **但 `build_commit.yaml` 与 `fork-unit-tests.yaml` 没有这个过滤器**（两者都是裸 `on: push`）
+  —— 实测（2026-10-06，提交 `8992c247`）它们照跑，耗时 **7m33s + 2m42s**。
+  所以「补文档」省掉的**只是 release，不是 CI**；想省轮次仍然只能把文档并进代码那次 push。
+  （此处曾误记成"纯文档零成本"，错在拿 `releases` 页的结论去推断 `actions` 有没有跑。）
 - tag 序号来自仓库**已有 tag**，不来自 `versionCode`（`47` 目前不变）。所以升级 versionName 时
   序号会从头开始（`v0.16.3-tablet.1`），这是刻意的：序号只表示"本 version 内的第几个预览包"。
 - **半成品排查**：若某次 run 建了 tag 但没挂上 release，重跑该 run 不会复用旧 tag（序号已 +1），
@@ -1148,4 +1153,86 @@ sfnt 偏移表少写一个 `H`（10 字节而非 12 字节）→ 表记录起点
 用**同一个字符串**（`"Source Han Serif SC"`），无论选哪条断言都成立 → **这条测试不可能失败**。
 改为两条记录文本不同、并把 zh-CN 放在文件更靠前的位置，这样"按语言选"和"按文件顺序选"
 才能被区分开。
+
+### 9.12 单源视图不再重复源名（2026-10-06，第六轮）
+
+**需求**（用户原话）："在信息流页面，每一篇文章上方都有本源的名称，这样太重复了，毫无必要。
+因为进入了这个源之后，顶部就有源的名称。去掉每一篇文章上方的源名称吧。"
+
+#### 关键设计判断：不能无条件移除
+
+信息流页面的列表组件 `ArticleList` 被**三类视图复用**，而顶栏标题的取值优先级是
+`group` > `feed` > filter（`FlowPage.kt` 的 `titleText`）：
+
+| 视图 | 顶栏标题 | 文章上方的源名 |
+|---|---|---|
+| 单个订阅源（`feed != null && group == null`） | **就是源名** | 纯重复 → 去掉 |
+| 文件夹（`group != null`） | 文件夹名 | **唯一出处信息** → 保留 |
+| 全部 / 已读 / 未读 / 搜索（两者皆 null） | 筛选名 | **唯一出处信息** → 保留 |
+
+所以无条件删除会让「全部」与「文件夹」视图里的文章彻底看不出属于哪个源 —— 那是**信息丢失**，
+不是去掉重复。用户经确认后选择**智能隐藏**：只在顶栏已经在显示该源名时隐藏。
+
+#### 实现（零缩进改动）
+
+- **新文件** `ui/page/home/flow/ArticleFeedName.kt`：两个纯函数
+  - `isSingleFeedFlow(groupScoped, feedScoped) = feedScoped && !groupScoped`
+  - `shouldShowArticleFeedName(preferenceEnabled, singleFeedFlow) = preferenceEnabled && !singleFeedFlow`
+  - `isSingleFeedFlow` **刻意复刻 `titleText` 的优先级**。两者必须对"顶栏此刻在显示什么"给出一致答案，
+    否则就会出现"标题是文件夹名、行里却不显示源名"的静默信息丢失。
+- **`FlowPage.kt`**：在 `titleText` 正下方 1 行推导 `val isSingleFeed = isSingleFeedFlow(...)`，
+  并在 `ArticleList(...)` 调用点透传。**不需要 import**（同包）。
+- **透传链**：`ArticleList` → `SwipeableArticleItem` → `ArticleItem(ArticleWithFeed)` → `ArticleItem(基础)`，
+  每处新增 `isSingleFeed: Boolean = false`。**默认值 false = 保持既有行为**，
+  所以 `FlowPagePreview` 等既有调用点一行都不用动。
+- **`ArticleItem.kt` 内两处判断收敛为一个 `showFeedName`**：原来是
+  `if (articleListFeedName.value)`（顶行）与 `if (!articleListFeedName.value && !articleListDate.value)`
+  （标题行）。两处各读一次偏好，正是"顶行与标题行漂移、把时间戳画两遍"的成因。
+  现在只读一次派生值。
+
+**上游友好度**：`git diff --stat` = 3 改 + 2 新增，**20 增 2 删，零缩进变化**
+（2 处删除就是那两个判断点本身）。选**参数透传**而不是 `CompositionLocal`，正是因为后者要在
+`FlowPage` 里包一层 `CompositionLocalProvider { … }`，会把 `LazyColumn` 那 65 行整体重排缩进 ——
+git 按行合并时那是最强的冲突磁铁。
+
+#### 刻意没做
+
+- **没有改 `FlowPagePreview.kt`**（设置页里的信息流预览）。该预览的顶栏画的是 `feed.name`，
+  即它描绘的是**单源视图**，按理应传 `isSingleFeed = true`；但那样「订阅源名称」这个开关
+  在预览里就**完全看不出效果**（因为预览无法同时表现单源与多源两种状态）。
+  两害相权取其轻：保留预览显示源名，让开关在预览里仍可验证，代价是预览比单源真机状态"多一行"。
+  **若用户反馈预览误导，再改成传 `true` 并把预览顶栏换成筛选名（那才自洽）。**
+- **没有动 `flowArticleListFeedName` 偏好本身**。它在多源视图里仍有实际作用，删了是功能回退。
+
+#### 离线核验结果（本机无 JDK，编译只能由 CI 证实）
+
+- 5 个文件括号平衡；`ArticleFeedNameTest` 的 7 个用例覆盖四种输入组合、`isSingleFeedFlow` 的三种情形、
+  「group 优先于 feed」这一微妙情形，以及一条性质断言（防 `||` 与游离的 `!`）
+- `assert --contains`：5 个文件共 16 条新声明全部存在
+- `imports --watch`：两个新符号均判定为 **same package**（即确实可达，不是仅仅拼对了）
+- 交叉核对：`ArticleItem.kt` 里 `articleListFeedName.value` **恰好出现 1 次**（只剩 Local 读取）、
+  `showFeedName` 恰好 3 次（1 声明 + 2 判断）、`ArticleList` 的两个 `SwipeableArticleItem` 调用点
+  **都**透传了 `isSingleFeed`（漏一个只会在对应设置档位的机器上静默出错）、
+  四个被改的调用点**全部使用具名参数**（Kotlin 禁止具名与位置混用，所以中间插参数不会错绑）
+
+**本轮踩到的一个校验台缺陷**（已修进技能的 `check_kotlin.py`）：测试名
+`` fun `a group beats a feed, matching the title's own precedence`() `` 里的撇号，
+被 `strip_kotlin` 当成字符字面量的起始，一路吞到文件尾，于是**一个完全平衡的文件报出
+"1 个未闭合 `{`"**。修法是让 `strip_kotlin` 跳过反引号标识符。
+**判据：报"未闭合"时先人工数一遍那段括号，再决定改代码还是改脚本。**
+
+#### 上游同步后要核验的
+
+- [ ] `FlowPage.kt` 的 `titleText` 是否仍是 `group` → `feed` → `filter` 的优先级。
+      **若上游改成 `feed` 优先**，则 `isSingleFeedFlow` 的 `!groupScoped` 必须同步取反，
+      否则"标题是源名、行里也不显示源名"会同时成立（重复）或相反（丢失）。
+- [ ] `filterUiState` 的 `group` / `feed` 是否仍可同时非空。当前 `FeedsPage` 两条导航路径
+      **互斥地**只设其中一个（`copy(group = group, feed = null)` / `copy(feed = feed, group = null)`），
+      但 `MainActivity` 的 widget 深链 `filterUseCase.init(feedId, groupId)` 两个都可能非空。
+      `!groupScoped` 就是为了覆盖这一支。
+- [ ] `ArticleItem` 的两个 `if` 是否仍由**同一个** `showFeedName` 驱动。上游若新增第三处
+      读 `articleListFeedName.value` 的地方，就重新引入了漂移。
+- [ ] `ArticleList` / `SwipeableArticleItem` / `ArticleItem` 的 `isSingleFeed` 参数是否仍被透传。
+      上游重构这条链时最容易掉的是 `ArticleList` 的**粘性表头分支**（第二个调用点）。
+- [ ] 三个函数是否仍**全部使用具名参数**被调用。这是"新增参数不会错绑"的前提。
 
