@@ -50,7 +50,7 @@ sealed class ReadingFontsPreference(val value: Int) : Preference() {
             SansSerif -> "Sans-Serif"
             Monospace -> "Monospace"
             Cursive -> "Cursive"
-            External -> context.getString(R.string.external_fonts)
+            External -> context.getString(R.string.import_font)
         }
 
     fun asFontFamily(context: Context): FontFamily =

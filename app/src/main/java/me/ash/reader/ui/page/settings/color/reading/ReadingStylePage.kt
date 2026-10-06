@@ -63,7 +63,12 @@ import me.ash.reader.ui.component.base.RYSwitch
 import me.ash.reader.ui.component.base.RadioDialog
 import me.ash.reader.ui.component.base.RadioDialogOption
 import me.ash.reader.ui.component.base.Subtitle
+import me.ash.reader.ui.component.hasImportedFont
+import me.ash.reader.ui.component.importFontOption
+import me.ash.reader.ui.component.importedFontName
 import me.ash.reader.ui.ext.ExternalFonts
+import me.ash.reader.ui.ext.FontNames
+import me.ash.reader.ui.ext.ListExternalFonts
 import me.ash.reader.ui.ext.MimeType
 import me.ash.reader.ui.ext.showToast
 import me.ash.reader.ui.page.settings.SettingItem
@@ -96,6 +101,19 @@ fun ReadingStylePage(
     var fontsDialogVisible by remember { mutableStateOf(false) }
     var titleFontsDialogVisible by remember { mutableStateOf(false) }
 
+    // Bumped after every import so the two dialogs below re-read the imported font's own name.
+    // One counter covers both rows: the body font goes through ExternalFonts, which has no
+    // generation counter of its own, and the title row's slot is read here rather than through
+    // `overridingFontFamily`.
+    var importTick by remember { mutableStateOf(0) }
+
+    val hasImportedReadingFont =
+        remember(importTick) { hasImportedFont(context, ExternalFonts.FontType.ReadingFont) }
+    val hasImportedReadingTitleFont =
+        remember(importTick) {
+            ListExternalFonts.hasFont(context, ListExternalFonts.Slot.ReadingTitle)
+        }
+
     val launcher =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             uri?.let {
@@ -104,7 +122,20 @@ fun ReadingStylePage(
                     it,
                     ExternalFonts.FontType.ReadingFont
                 ).copyToInternalStorage()
+                // The sidecar is what lets the dialog say which font this row is on rather than only
+                // "Imported"; ExternalFonts itself knows nothing about names.
+                FontNames.record(context, ExternalFonts.FontType.ReadingFont.value, it)
                 ReadingFontsPreference.External.put(context, scope)
+                importTick++
+            } ?: context.showToast("Cannot get activity result with launcher")
+        }
+
+    val titleFontLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let {
+                ListExternalFonts.import(context, it, ListExternalFonts.Slot.ReadingTitle)
+                ReadingTitleFontsPreference.put(context, scope, TitleFontsPreference.External)
+                importTick++
             } ?: context.showToast("Cannot get activity result with launcher")
         }
 
@@ -324,14 +355,22 @@ fun ReadingStylePage(
         visible = fontsDialogVisible,
         title = stringResource(R.string.reading_fonts),
         options = ReadingFontsPreference.values.map {
-            RadioDialogOption(
-                text = it.toDesc(context),
-                style = TextStyle(fontFamily = it.asFontFamily(context)),
-                selected = it == fonts,
-            ) {
-                if (it.value == ReadingFontsPreference.External.value) {
-                    launcher.launch(arrayOf(MimeType.FONT))
-                } else {
+            if (it == ReadingFontsPreference.External) {
+                // The body font keeps the app-wide reading slot: the WebView renderer reads that
+                // file directly, so it is the one row that cannot have a slot of its own.
+                importFontOption(
+                    selected = fonts == ReadingFontsPreference.External,
+                    imported = hasImportedReadingFont,
+                    name = importedFontName(ExternalFonts.FontType.ReadingFont.value, importTick),
+                    fontFamily = it.asFontFamily(context),
+                    onImport = { launcher.launch(arrayOf(MimeType.FONT)) },
+                )
+            } else {
+                RadioDialogOption(
+                    text = it.toDesc(context),
+                    style = TextStyle(fontFamily = it.asFontFamily(context)),
+                    selected = it == fonts,
+                ) {
                     it.put(context, scope)
                 }
             }
@@ -344,12 +383,29 @@ fun ReadingStylePage(
         visible = titleFontsDialogVisible,
         title = stringResource(R.string.title_fonts),
         options = TitleFontsPreference.values.map {
-            RadioDialogOption(
-                text = it.toDesc(context),
-                style = it.asFontFamily(context)?.let { family -> TextStyle(fontFamily = family) },
-                selected = it == titleFonts,
-            ) {
-                ReadingTitleFontsPreference.put(context, scope, it)
+            if (it == TitleFontsPreference.External) {
+                importFontOption(
+                    selected = titleFonts == TitleFontsPreference.External,
+                    imported = hasImportedReadingTitleFont,
+                    name =
+                        importedFontName(
+                            ListExternalFonts.Slot.ReadingTitle.fileName,
+                            importTick,
+                        ),
+                    fontFamily = it.asFontFamily(context, ListExternalFonts.Slot.ReadingTitle),
+                    onImport = { titleFontLauncher.launch(arrayOf(MimeType.FONT)) },
+                )
+            } else {
+                RadioDialogOption(
+                    text = it.toDesc(context),
+                    style =
+                        it.asFontFamily(context, ListExternalFonts.Slot.ReadingTitle)?.let { family ->
+                            TextStyle(fontFamily = family)
+                        },
+                    selected = it == titleFonts,
+                ) {
+                    ReadingTitleFontsPreference.put(context, scope, it)
+                }
             }
         }
     ) {

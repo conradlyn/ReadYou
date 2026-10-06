@@ -48,6 +48,7 @@ data class Settings(
     val flowSortUnreadArticles: SortUnreadArticlesPreference = SortUnreadArticlesPreference.default,
     val flowFonts: ListFontsPreference = ListFontsPreference.default,
     val flowTitleFonts: TitleFontsPreference = TitleFontsPreference.default,
+    val flowSummaryFonts: TitleFontsPreference = TitleFontsPreference.default,
     val flowTextFontSize: Int = FlowTextFontSizePreference.default,
 
     // Reading page

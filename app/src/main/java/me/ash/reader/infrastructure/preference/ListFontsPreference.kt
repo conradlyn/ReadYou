@@ -59,7 +59,7 @@ sealed class ListFontsPreference(val value: Int) {
             SansSerif -> "Sans-Serif"
             Monospace -> "Monospace"
             Cursive -> "Cursive"
-            External -> context.getString(R.string.external_fonts)
+            External -> context.getString(R.string.import_font)
         }
 
     companion object {

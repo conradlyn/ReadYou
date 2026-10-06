@@ -40,7 +40,7 @@ sealed class BasicFontsPreference(val value: Int) : Preference() {
         when (this) {
             System -> context.getString(R.string.system_default)
             GoogleSans -> context.getString(R.string.google_sans)
-            External -> context.getString(R.string.external_fonts)
+            External -> context.getString(R.string.import_font)
         }
 
     fun asFontFamily(context: Context): FontFamily =

@@ -26,7 +26,7 @@
 | 已读后列表空则返回订阅源 | `FlowPage.kt` 的 `leavingWhenEmpty` 标志 + 1 个 `LaunchedEffect` + 纯函数 `shouldLeaveAfterMarkAsRead` | 三个手势都要布防；退出走既有的 `onNavigateUp`。两个静默风险见 §9.10 |
 | "全部已读"的**设置行** | `ui/page/settings/color/flow/FlowPageStylePage.kt` 的「顶部栏」分区 | 位置 + 免确认**两行必须相邻**；曾经被拆到两个分区、相隔 140 行导致没人找得到（见 §2.7） |
 | 新增偏好 | `ui/ext/DataStoreExt.kt` + `preference/{Settings,Preference,SettingsProvider}.kt` | 加一项要同时改 5 个地方，见 §2.6 |
-| 字体设置（每页两行） | 信息流：`ListFonts.kt` 的 `withFlowTitleStyle()` + `ArticleItem.kt` 标题；阅读页：`reading/Metadata.kt` 的 `titleFontFamily` | 每页 = **基础行 + 标题覆盖行**，覆盖行的「跟随」默认值即回落到基础行（见 §2.8） |
+| 字体设置（信息流三行，其余一/两行） | 信息流：`ListFonts.kt` 的 `withFlowTitleStyle()` / `withFlowSummaryStyle()` + `ArticleItem.kt` 的标题与摘要；阅读页：`reading/Metadata.kt` 的 `titleFamily` | 每页 = **基础行 + 覆盖行**，覆盖行的「跟随」默认值即回落到基础行（见 §2.8） |
 | 打开文章自动拉全文 | `ArticleListReaderViewModel.kt` 的 `isFullContentOnOpen()` / `renderContent()` | 与订阅源自带的 `feed.isFullContent` 是**或**关系，但失败处理故意不同（见 §2.8） |
 | 图标解码尺寸 | `ui/component/FeedIcon.kt` 的私有常量 `FEED_ICON_DECODE_SIZE` | 不传 `size` 会落到 `RYAsyncImage` 的默认 `Size.ORIGINAL`，即按原始分辨率解码 |
 | 已读状态的重组范围 | `ui/page/home/flow/ArticleList.kt` 的 `rememberIsUnread()` | `diffMap` 是 `SnapshotStateMap`，直接读记录的是 map 级依赖；包一层 `derivedStateOf` |
@@ -34,7 +34,8 @@
 | 抓取层（UA / 字符集） | `infrastructure/di/OkHttpClientModule.kt`、`infrastructure/rss/RssHelper.kt` | 来自上游 open PR，见 §9.2 |
 | 平板缩放（图标 / 控件高度） | `ui/adaptive/AdaptiveSizing.kt` 的 `adaptiveSize()` + 15 个调用点 | **Compact 恒等**；只放大字形与承载它的栏高，见 §2.2 / §2.3 |
 | FilterBar / 搜索栏跟随页面字号 | `ui/component/FilterBar.kt` 的 `labelStyle` 参数、`flow/SearchBar.kt` 的 `textStyle` 参数 | 默认值与上游逐字节等价，调用点可原样不传 |
-| 两页**各自**的自定义 TTF | `ui/ext/ListExternalFonts.kt` 的 `Slot.Feeds` / `Slot.Flow` | 不新增偏好键，复用 `ListFontsPreference.External` |
+| **每一行字体各自**的自定义 TTF | `ui/ext/ListExternalFonts.kt` 的 5 个 `Slot` | 不新增偏好键，复用 `External`；`.ttf` 文件名与"字体自称的名字"是两件事，见 §2.8 / §9.11 |
+| 字体对话框末行的「导入字体」 | `ui/component/FontImport.kt` 的 `importFontOption()` + `RadioDialogOption.dismissOnClick` | 7 个字体对话框共用**一处**实现；点击**不关闭**对话框，否则导入后的字体名看不见，见 §9.11 |
 | 平板触控目标 | `ui/adaptive/AdaptiveSizing.kt` 的 `Modifier.adaptiveIconButtonContainer()` + 2 个调用点 | **手机档一个尺寸都不传**；传了会把 48dp 压小，见 §2.2 / §9.8 |
 | 列表行高与内边距 | `GroupItem.kt`(5) / `FeedItem.kt`(4) / `ArticleItem.kt`(10) 处内边距，各包一层 `adaptiveSize()` | 其中 `ArticleItem` 的 `start = 30.dp` 是给 `FeedIcon` 预留的缩进，属**正确性**而非美观，见 §9.8 |
 | 界面字号（设置页） | `ui/page/nav3/SettingsNavEntry.kt` 的 `settingsNavEntry()` + `AppEntry.kt` 19 处调用点 | 只包设置类路由；`Feeds`/`Reading`/`Startup`/`else` 保持裸 `NavEntry`，见 §9.9 |
@@ -44,16 +45,19 @@
 | 绕过 typography 的硬编码 sp | `SettingItem.kt` / `SelectableSettingGroupItem.kt` / `Banner.kt` 各 1 处 `.copy(fontSize = 20.sp)` → `uiTextScaleSp(20.sp)` | 这三处**不读** typography 槽位，重建 typography 覆盖不到，见 §9.9 |
 
 **新增文件（永不冲突）**：`ui/adaptive/{AdaptiveLayout,AdaptiveContentPadding,AppSizeClass,AdaptiveSizing}.kt`、
-`ui/component/ListFonts.kt`、`ui/ext/ListExternalFonts.kt`、
+`ui/component/ListFonts.kt`、`ui/component/FontImport.kt`、
+`ui/ext/ListExternalFonts.kt`、`ui/ext/FontNames.kt`、
 `ui/theme/UiTextScale.kt`、`ui/page/nav3/SettingsNavEntry.kt`、
 `infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
 `ListFontsPreference.kt`、`MarkAsReadButtonPositionPreference.kt`、
 `MarkAllAsReadWithoutConfirmPreference.kt`、`TitleFontsPreference.kt`、
-`{Flow,Reading}TitleFontsPreference.kt`、`ReadingAutoFullContentPreference.kt`、
+`{Flow,Reading}TitleFontsPreference.kt`、`FlowSummaryFontsPreference.kt`、
+`ReadingAutoFullContentPreference.kt`、
 `UiTextScalePreference.kt`、
 `app/src/main/baseline-prof.txt`、四个 workflow、
-7 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
-`AdaptiveScaleTest`、`OkHttpClientModuleTest`、`UiTextScaleTest`、`FlowPageLeaveTest`）。
+8 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
+`AdaptiveScaleTest`、`OkHttpClientModuleTest`、`UiTextScaleTest`、`FlowPageLeaveTest`、
+`FontNamesTest`）。
 
 ---
 
@@ -287,38 +291,55 @@ navigationIcon = {
 
 ---
 
-### 2.8 字体设置是两层：基础行 + 标题覆盖行（2026-09-24 加）
+### 2.8 字体设置是两层：基础行 + 覆盖行；每行各自导入（2026-09-24 加，2026-09-27 扩）
 
-信息流和阅读页各有**两行**字体设置，**不是两个平级的独立设置**：
+**不是平级的独立设置，而是「基础行 + 覆盖行」**：
 
-| 页面 | 基础行（原有） | 覆盖行（新增，默认「跟随页面字体」） |
+| 页面 | 基础行（原有） | 覆盖行（默认「跟随页面字体」） |
 |---|---|---|
-| 信息流 | 「列表字体」`flowFonts` → 摘要 + 订阅名 + 时间 | 「标题字体」`flowTitleFonts` → 文章标题 |
+| 信息流 | 「列表字体」`flowFonts` → 订阅名 + 时间（+ 顶部粘性日期） | 「标题字体」`flowTitleFonts` → 文章标题；「摘要字体」`flowSummaryFonts` → 文章摘要 |
 | 阅读页 | 「阅读字体」`readingFonts` → 正文 + 各级小标题 + 日期/作者/订阅名 | 「标题字体」`readingTitleFonts` → 文章大标题 |
+| 订阅源 | 「列表字体」`feedsFonts` → 分组名 + 订阅名 | — |
+| 颜色和样式 | 「应用界面字体」`basicFonts`（原「基本字体」，只改名） | — |
 
 **为什么是"覆盖"而不是"两个独立设置"**：`TitleFontsPreference.Follow` 的语义是*回落到基础行*，
 所以任意 (标题字体, 正文字体) 组合都可达 —— 把基础行设成正文那个、覆盖行设成标题那个即可，
 反过来也行。收益是**默认值就是零变化**：不动这项的老用户，观感与升级前一致，也不需要数据迁移。
 代价只是 UI 上多了一层"跟随"的概念。
 
-渲染接线只有三处，都很浅：
+渲染接线（样式入口全部在 `ui/component/ListFonts.kt`，都很浅）：
 
-- **信息流标题**：`ui/component/ListFonts.kt` 的 `withFlowTitleStyle()`（唯一新增的样式入口），
-  `ArticleItem.kt` 标题那一行从 `.withFlowListStyle()` 改成它。
-  **它内部照样调 `withListStyle`，所以字号缩放与基线完全不变** —— 别在这里另算一遍 scale，
+- **信息流标题 / 摘要**：`withFlowTitleStyle()` / `withFlowSummaryStyle()`；`ArticleItem.kt` 的标题与
+  摘要分别从 `.withFlowListStyle()` 改成它们。
+  **两者内部照样调 `withListStyle`，所以字号缩放与基线完全不变** —— 别在这里另算一遍 scale，
   否则 §2.2 的 16sp 基线守卫与它不一致。
-- **阅读页标题**：`ui/page/home/reading/Metadata.kt` 的 `titleFontFamily`（`?:` 回落到
-  `fontFamily`），**只作用于 `headlineLarge` 那一处**；同文件的日期 / 作者 / 订阅名是正文，
-  继续跟 `readingFonts`。WebView 渲染器不受影响 —— 标题始终由 Compose 的 `Metadata` 画，
-  `RYWebView` 只注入正文。
+- **阅读页标题**：`ui/page/home/reading/Metadata.kt` 的 `titleFamily`（`?:` 回落到 `fontFamily`），
+  **只作用于 `headlineLarge` 那一处**；同文件的日期 / 作者 / 订阅名是正文，继续跟 `readingFonts`。
+  WebView 渲染器不受影响 —— 标题始终由 Compose 的 `Metadata` 画，`RYWebView` 只注入正文。
 - **设置页预览**：`TitleAndTextPreview.kt` 的标题预览也用覆盖行，否则改完设置看到的预览是假的。
 
-上游合并时要看的两点：
+**「跟随」与「选了导入字体但该行还没导入」是同一个状态**（2026-09-27 统一）：
+`overridingFontFamily()` 返回 `null` 有两种来路 —— `TitleFontsPreference.Follow`，以及 `External`
+但该行自己的槽位是空的 —— 调用方一律 `?:` 回落到页面基础行。**这条是零回归的关键**：阅读页标题的
+`External` 在改造前指的是 `reading_font.ttf`，所以「`External` + 该行没导入」必须继续回落到阅读字体，
+而不是掉到系统字体。（`ListFontsPreference.External` 仍返回 `FontFamily.Default`，因为那一行没有
+"上一层"可回落。）
 
-- [ ] `ArticleItem.kt` 的标题是否仍走 `.merge(lineHeight = 22.sp).withFlowTitleStyle()`。
-      上游若调整标题样式，只把最后那个扩展函数换掉，**别把 `withFlowListStyle` 也一起换回来**。
+**回落在调用点，不在 `ListExternalFonts` 里**：`Slot` **没有** `fallback` 字段。因为"回落到哪"是
+「下一个该问哪个偏好」的决策，而阅读页标题要回落到的 `reading_font.ttf` 根本不属于
+`ListExternalFonts`。所以是 `ListFonts.kt` / `Metadata.kt` 里的 `?:`，不是枚举链 —— 曾短暂写成
+枚举链，同一次改动内改回来了，别再加回去。
+
+上游合并时要看的三点：
+
+- [ ] `ArticleItem.kt` 的标题是否仍走 `.merge(lineHeight = 22.sp).withFlowTitleStyle()`、摘要是否仍走
+      `bodySmall.…withFlowSummaryStyle()`。上游若调整样式，只把最后那个扩展函数换掉，
+      **别把 `withFlowListStyle` 也一起换回来**（换回去 = 摘要字体设置**静默**失效）。
 - [ ] `Metadata.kt` 里 `headlineLarge` 是否仍是标题、`labelMedium` 是否仍是元数据。
-      上游若换掉，`titleFontFamily` 的作用位置要跟着挪。
+      上游若换掉，`titleFamily` 的作用位置要跟着挪。
+- [ ] `Metadata.kt` / `TitleAndTextPreview.kt` 里的 `overridingFontFamily(…, Slot.ReadingTitle)` 是否还在。
+      上游若把 `LocalReadingTitleFonts.current.asFontFamily(context)`（单参数版）改回来，
+      **不会编译错，只会静默**：阅读页标题的「导入字体」再也选不中自己那一行。
 
 **「打开文章自动拉取全文」**（同批加的 `readingAutoFullContent`，默认关）只落在一个地方：
 `ArticleListReaderViewModel.renderContent()`。它与订阅源自带的 `feed.isFullContent` 是**或**关系，
@@ -345,6 +366,19 @@ navigationIcon = {
 - [ ] **拖动窗口跨断点**：无跳变、无崩溃
 - [ ] **列表字号** 10 / 16 / 32sp：单调变化；16sp 时与上游外观一致
 - [ ] **列表字体**：External 与阅读页一致；Default 无变化
+- [ ] **字体对话框末行是「导入字体」（7 处都要看）**：订阅源列表字体 / 信息流列表·标题·摘要 /
+      阅读字体·标题 / 应用界面字体。末行都应是「导入字体」，**不再是**「外部字体」
+- [ ] **点「导入字体」对话框不关闭（关键）**：返回后对话框应**留在原地**、该行下方出现字体名。
+      若对话框自己关掉了，说明 `dismissOnClick = false` 被改回了默认值，见 §9.11
+- [ ] **字体名是字体自称的名字**：导入思源宋体之类的 .ttf → 显示「思源宋体」，不是文件名
+- [ ] **还没导入时**：该行下方显示「尚未导入」；文件在但解析不出名字时显示「已导入」
+- [ ] **摘要字体独立生效**：把「摘要字体」设成 Serif → 只有文章摘要变，标题与订阅名不动
+- [ ] **信息流标题 / 摘要的「导入字体」回落正确（关键，零回归项）**：设为「导入字体」但**不导入**
+      → 应回落到列表字体，**不是**掉到系统字体，见 §2.8
+- [ ] **阅读页标题的「导入字体」回落正确（关键，零回归项）**：同上，应回落到**阅读字体**
+- [ ] **导入阅读字体 / 应用界面字体后应用会重启**：这是上游既有行为（`Context.restart()` 走
+      `Runtime.exit(0)`），不是崩溃；重启后回到设置页，该行下方应显示字体名
+- [ ] **改名生效**：「颜色和样式」下那一行现在叫「应用界面字体」，不再是「基本字体」
 - [ ] **界面字号 = 100%（默认）**：设置页与对话框与改动前**逐像素一致**（`scaledTypography` 返回同一实例，见 §2.3 同款约束）
 - [ ] **界面字号 = 150%**：**逐个**设置子页无文字裁切 / 无重叠；标题与说明都变大；那 3 处硬编码 sp
       （`SettingItem` / `SelectableSettingGroupItem` / `Banner`）跟着变大
@@ -1007,4 +1041,91 @@ Pager 重载，列表变空——但 `FlowPage` 还在。用户落在一个空�
 纯函数声明 1、上游 `collectAsLazyPagingItems` 与 `markAllAsRead()` 调用行原样未动）。
 提交 `9c82209c`。**注意：本机没有 JDK / Android SDK，编译由 GitHub Actions 完成，
 所以真正的编译结论要看那三个 job，不以上面的静态检查为准。**
+
+---
+
+### 9.11 字体设置收束：每行各自导入，末行显示真实字体名（2026-09-27，第五轮）
+
+**需求原话**（节选）：「颜色和样式下的『基本字体』其实不用这个选项，我更希望在样式下的订阅源页面、
+信息流页面、阅读页面三个级别下进去单独设置……点开列表字体，现在有『外部字体』，我希望这个字眼换成
+『导入字体』，点击便是那个导入字体的功能，导入后对应的字体名称以小一号的形式显示在这个复选框下面，
+这样就知道导入的是什么字体……同时应该增加一个摘要字体……归根结底，那些地方都有设置字体的功能，
+同时设置字体的功能最下面一个选项应该是导入字体，导入完成后在该选项下方以小一号的字体显示导入字体的
+名称，便于一眼就能知道是什么字体。」
+
+**四点拍板**：① 基本字体**不移除**，改名「应用界面字体」；② 信息流列表字体**原样保留**，只加摘要字体；
+③ **每项独立导入**；④ 字体名要**解析 TTF 内嵌的真实字体名**，不是文件名。
+
+**关键认识：不需要新增任何选项。** `ListFontsPreference` 与 `TitleFontsPreference` 的 `values`
+**本来就把 `External` 放在最后**，所以"最下面一个选项是导入字体"= 把 `External` 那一项改名 +
+加副标题 + 改成点开文件选择器。7 个字体对话框各自只多了一个 `if`。
+
+**落点**：
+
+| 位置 | 改动 |
+|---|---|
+| `ui/component/FontImport.kt`（新） | `importFontOption()` / `importedFontName()` / `hasImportedFont()`，7 个对话框共用 |
+| `ui/component/base/RadioDialog.kt` | `RadioDialogOption` 加 `subtitle` 与 `dismissOnClick` |
+| `ui/ext/FontNames.kt`（新，约 230 行） | 纯函数 sfnt `name` 表解析器 + 侧车文件持久化 |
+| `ui/ext/ListExternalFonts.kt` | 5 个 `Slot`（`Feeds`/`Flow`/`FlowTitle`/`FlowSummary`/`ReadingTitle`） |
+| `infrastructure/preference/FlowSummaryFontsPreference.kt`（新） | 摘要字体偏好，值类型复用 `TitleFontsPreference` |
+| 4 个字体枚举的 `toDesc()` | `External` 从 `R.string.external_fonts` 改为 `R.string.import_font` |
+| 4 个设置页 | 删掉独立的「导入字体」SettingItem，折叠进对话框末行 |
+| `res/values{,-zh-rCN,-zh-rTW}` | `app_interface_fonts` / `summary_fonts` / `tips_import_font` |
+
+**四个容易做错的地方（本轮真正的设计内容）**：
+
+1. **对话框点「导入字体」不能关闭。** `RadioDialog` 原来无条件 `onDismissRequest()`，而这一行的
+   全部意义就是"导入后让名字出现"——关掉对话框等于把唯一的反馈藏了。所以 `RadioDialogOption` 加了
+   `dismissOnClick`，默认 `true`（30 余处既有调用点全部不受影响），只有这一行传 `false`。
+   **`dismissOnClick` 必须声明在 `onClick` 之前**：Kotlin 的尾随 lambda 绑定的是**最后一个**参数，
+   放在 `onClick` 之后会让既有 30 余处 `RadioDialogOption(...) { ... }` 全部编译不过。
+2. **字体名不能只存在内存里。** 名字来自 TTF 内嵌的 `name` 表（`FontNames.familyName()`，纯函数，
+   对字节做解析，JVM 可测），但**显示**走的是旁边一个几十字节的侧车文件（`xxx.ttf.name`）。
+   理由：若改成在 composition 里往 `mutableStateMapOf` 写名字，设置行会自我重组成环；
+   而每次开对话框都重新解析一个几 MB 的字体文件也不值当。
+   **代价**是名字不会自己刷新（偏好值在"已选 External 再导入第二个文件"时根本不变），所以每个页面
+   传一个 `refreshKey`：信息流/订阅源页直接用已有的 `ListExternalFonts.generation(slot)`，
+   阅读页与颜色和样式页用一个本地 `importTick`。
+3. **`name` 表的选取顺序不是偏好，是正确性顺序**：`nameID` **16 > 1 > 4**；
+   Windows（UTF-16BE）优先于 Unicode 优先于 Macintosh（单字节 legacy 编码）；
+   语言 **zh-CN(0x0804) 优先于 en-US(0x0409)**，这样中文用户看到的是"思源宋体"而不是
+   "Source Han Serif"。**每一处读取都做边界检查，任何失败一律返回 `null`**——
+   字体是从应用外挑来的文件，截断的、加密的、WOFF 的都可能，必须退化成"不显示名字"而不是把设置页搞崩。
+4. **回落放在调用点，不放在 `Slot` 里**（详见 §2.8）：`overridingFontFamily()` 的 `null` 同时表示
+   「跟随」和「选了导入但该行还没导入」，调用方一律回落到页面基础行。**这是零回归的关键**：
+   阅读页标题的 `External` 在改造前指的是 `reading_font.ttf`，所以必须继续回落到阅读字体。
+
+**零迁移成本**：新槽位的文件名是 `feeds_font.ttf` / `flow_font.ttf` **原样沿用**，
+`flow_title_font.ttf` / `flow_summary_font.ttf` / `reading_title_font.ttf` 是新名字。
+老用户已经导入的那一个文件仍然生效。
+
+**刻意没做**：没有给 `TitleFontsPreference` 改名。它被信息流标题与阅读标题**共用**
+（28 处引用、跨 7 个文件），改名只是 churn，改为在 KDoc 里写清它是"覆盖或跟随"共用枚举。
+`R.string.external_fonts` / `basic_fonts` / `tips_list_external_fonts` 三个字符串因此变成
+**定义了但没代码引用**——没有删，删了要动 50 多个翻译文件，而 CI 不跑 lint 的 `UnusedResources`。
+
+**上游同步后要核验的**：
+
+- [ ] `ListFontsPreference.values` / `TitleFontsPreference.values` 里 `External` 是否**仍在最后**。
+      上游若重排，导入字体那一行会跑到中间——**不会编译错，只是不再在末行**。
+- [ ] `RadioDialogOption` 的 `onClick` 是否仍是**最后一个**构造参数。上游若在它后面加字段，
+      本 fork 那 30 余处尾随 lambda 调用点会一起编译失败（算幸运）。
+- [ ] `RadioDialog` 里 `if (option.dismissOnClick) onDismissRequest()` 是否还在。
+      上游若改回无条件 dismiss，导入后名字**看不见**（静默）。
+- [ ] `BasicFontsPreference` / `ReadingFontsPreference` 的 `put()` 里 `context.restart()` 是否还在。
+      这是上游行为，本 fork **依赖**它来清 `ExternalFonts` 的静态 `Typography` 缓存：
+      这两行的导入**不靠** `generation`，靠重启。若上游移除了重启，那两行会静默不刷新。
+- [ ] `ExternalFonts.FontType` 的两个枚举值（`BasicFont` / `ReadingFont`）名称与 `value` 是否还在——
+      `FontNames.record(context, type.value, uri)` 和 `hasImportedFont(context, type)` 都依赖它。
+- [ ] 三个新字符串键（`app_interface_fonts` / `summary_fonts` / `tips_import_font`）是否被上游
+      同名占用；`values-zh-rCN` / `values-zh-rTW` 需同步（本 fork 已加）。
+
+**核验结果**：离线校验全过——3 个 strings.xml 格式良好且无重名、新键三处齐全、22 个 Kotlin 文件
+括号/圆括号/方括号平衡、81 个 `R.string` 引用全部有定义、9 个新符号在每个使用处都有 import
+（含通配符）、**39 处 `RadioDialogOption` 调用点的具名参数全部合法**、
+`flowSummaryFonts` 的 6 个注册点齐全、无 `loadWithFallback` / `Slot.fallback` 残留。
+另用 Python 独立复算了 `FontNames` 的解析逻辑（含 **52 种截断全部被正确拒绝**）。
+**注意：本机没有 JDK / Android SDK，编译由 GitHub Actions 完成，所以真正的编译结论要看那三个 job，
+不以上面的静态检查为准。**
 

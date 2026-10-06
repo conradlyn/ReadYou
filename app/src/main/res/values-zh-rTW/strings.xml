@@ -124,6 +124,9 @@
     <string name="reading_fonts">閱讀字型</string>
     <string name="list_fonts">清單字型</string>
     <string name="basic_fonts">基本字型</string>
+    <string name="app_interface_fonts">應用介面字型</string>
+    <string name="title_fonts">標題字型</string>
+    <string name="summary_fonts">摘要字型</string>
     <string name="feeds_page">來源頁面</string>
     <string name="flow_page">消息串頁面</string>
     <string name="reading_page">閱讀頁面</string>
@@ -168,6 +171,7 @@
     <string name="tips_article_list_tonal_elevation">文章清單的色調海拔僅適用於淺色主題</string>
     <string name="tips_group_list_tonal_elevation">群組清單的色調海拔僅適用於淺色主題</string>
     <string name="tips_list_external_fonts">「External fonts」會使用你為本頁匯入的 .ttf 字型</string>
+    <string name="tips_import_font">每一行字型都可以各自匯入一個 .ttf 檔案</string>
     <string name="share">分享</string>
     <string name="touch_to_play_video">輕觸即可播放影片</string>
     <string name="text">內文</string>

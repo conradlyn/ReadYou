@@ -107,6 +107,7 @@ class SettingsProvider @Inject constructor(
             LocalSortUnreadArticles provides settings.flowSortUnreadArticles,
             LocalFlowFonts provides settings.flowFonts,
             LocalFlowTitleFonts provides settings.flowTitleFonts,
+            LocalFlowSummaryFonts provides settings.flowSummaryFonts,
             LocalFlowTextFontSize provides settings.flowTextFontSize,
 
             // Reading page

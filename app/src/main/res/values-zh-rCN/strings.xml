@@ -125,6 +125,7 @@
     <string name="reading_fonts">阅读字体</string>
     <string name="list_fonts">列表字体</string>
     <string name="basic_fonts">基本字体</string>
+    <string name="app_interface_fonts">应用界面字体</string>
     <string name="feeds_page">订阅源页面</string>
     <string name="flow_page">信息流页面</string>
     <string name="reading_page">阅读页面</string>
@@ -170,6 +171,7 @@
     <string name="tips_article_list_tonal_elevation">文章列表的色调海拔仅在亮色主题时可用</string>
     <string name="tips_group_list_tonal_elevation">分组列表的色调海拔仅在亮色主题时可用</string>
     <string name="tips_list_external_fonts">“External fonts” 会使用你为本页导入的 .ttf 字体</string>
+    <string name="tips_import_font">每一行字体都可以各自导入一个 .ttf 文件</string>
     <string name="share">分享</string>
     <string name="touch_to_play_video">轻触播放视频</string>
     <string name="text">文本</string>
@@ -355,6 +357,7 @@
     <string name="enable">启用</string>
     <string name="disable">停用</string>
     <string name="title_fonts">标题字体</string>
+    <string name="summary_fonts">摘要字体</string>
     <string name="follow_page_font">跟随页面字体</string>
     <string name="auto_fetch_full_content">自动拉取全文</string>
     <string name="auto_fetch_full_content_desc">打开文章时直接拉取全文，无需再点“全文解析”</string>

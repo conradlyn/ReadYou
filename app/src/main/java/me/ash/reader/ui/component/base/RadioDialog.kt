@@ -1,5 +1,6 @@
 package me.ash.reader.ui.component.base
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,7 +63,7 @@ fun RadioDialog(
                                 .clip(MaterialTheme.shapes.extraLarge)
                                 .selectable(selected = option.selected) {
                                     option.onClick()
-                                    onDismissRequest()
+                                    if (option.dismissOnClick) onDismissRequest()
                                 }
                                 .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -72,15 +73,28 @@ fun RadioDialog(
                             onClick = null,
                             modifier = Modifier.padding(horizontal = 12.dp),
                         )
-                        Text(
-                            modifier = Modifier.padding(start = 6.dp),
-                            text = option.text,
-                            style =
-                                MaterialTheme.typography.bodyLarge
-                                    .copy(baselineShift = BaselineShift.None)
-                                    .merge(other = option.style),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
+                        Column(modifier = Modifier.padding(start = 6.dp)) {
+                            Text(
+                                text = option.text,
+                                style =
+                                    MaterialTheme.typography.bodyLarge
+                                        .copy(baselineShift = BaselineShift.None)
+                                        .merge(other = option.style),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            // A second line, one step down the type scale, for options that need to
+                            // say what they currently point at - an imported font's own name, so the
+                            // row does not only say "Import font" once something has been imported.
+                            // Deliberately *not* drawn in `option.style`: the whole point is that it
+                            // stays legible no matter which font it is naming.
+                            if (option.subtitle != null) {
+                                Text(
+                                    text = option.subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -93,7 +107,19 @@ fun RadioDialog(
 @Immutable
 data class RadioDialogOption(
     val text: String = "",
+    /** A second line under [text], one step down the type scale. `null` for the usual single line. */
+    val subtitle: String? = null,
     val style: TextStyle? = null,
     val selected: Boolean = false,
+    /**
+     * Whether picking this option closes the dialog.
+     *
+     * `false` for the font dialogs' import row, which opens a file picker: closing the dialog there
+     * would hide the imported font's name, and showing that name is the row's whole purpose.
+     *
+     * Declared before [onClick] so that `onClick` stays the last parameter and every existing call
+     * site keeps working as a trailing lambda.
+     */
+    val dismissOnClick: Boolean = true,
     val onClick: () -> Unit = {},
 )

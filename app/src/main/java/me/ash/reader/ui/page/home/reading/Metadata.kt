@@ -21,6 +21,8 @@ import me.ash.reader.infrastructure.preference.LocalReadingTitleAlign
 import me.ash.reader.infrastructure.preference.LocalReadingTitleBold
 import me.ash.reader.infrastructure.preference.LocalReadingTitleFonts
 import me.ash.reader.infrastructure.preference.LocalReadingTitleUpperCase
+import me.ash.reader.ui.component.overridingFontFamily
+import me.ash.reader.ui.ext.ListExternalFonts
 import me.ash.reader.ui.ext.formatAsString
 import me.ash.reader.ui.ext.requiresBidi
 import me.ash.reader.ui.theme.applyTextDirection
@@ -43,7 +45,11 @@ fun Metadata(
         remember(publishedDate) { publishedDate.formatAsString(context, atHourMinute = true) }
     val fontFamily = LocalReadingFonts.current.asFontFamily(context)
     // The date, author and feed name are body text; only the headline below gets its own font.
-    val titleFontFamily = LocalReadingTitleFonts.current.asFontFamily(context) ?: fontFamily
+    // `?: fontFamily` is the fallback for a title row that says "Import font" with nothing imported
+    // yet, which keeps the reading font it used before the title had an import of its own.
+    val titleFamily =
+        overridingFontFamily(LocalReadingTitleFonts.current, ListExternalFonts.Slot.ReadingTitle)
+            ?: fontFamily
 
     val titleUpperCaseString by remember { derivedStateOf { title.uppercase() } }
 
@@ -70,7 +76,7 @@ fun Metadata(
             style =
                 MaterialTheme.typography.headlineLarge
                     .merge(
-                        fontFamily = titleFontFamily,
+                        fontFamily = titleFamily,
                         fontWeight = if (titleBold.value) FontWeight.Bold else FontWeight.Medium,
                     )
                     .applyTextDirection(requiresBidi = title.requiresBidi()),

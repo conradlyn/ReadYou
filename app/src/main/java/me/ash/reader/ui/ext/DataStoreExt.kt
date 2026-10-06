@@ -165,6 +165,7 @@ sealed interface PreferencesKey {
         const val flowSortUnreadArticles = "flowArticleListSortUnreadArticles"
         const val flowFonts = "flowFonts"
         const val flowTitleFonts = "flowTitleFonts"
+        const val flowSummaryFonts = "flowSummaryFonts"
         const val flowTextFontSize = "flowTextFontSize"
 
         // Reading page
@@ -255,6 +256,7 @@ sealed interface PreferencesKey {
                 BooleanKey(flowSortUnreadArticles),
                 IntKey(flowFonts),
                 IntKey(flowTitleFonts),
+                IntKey(flowSummaryFonts),
                 IntKey(flowTextFontSize),
                 // Reading page
                 IntKey(readingRenderer),
@@ -350,6 +352,7 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
         const val flowSortUnreadArticles = "flowArticleListSortUnreadArticles"
         const val flowFonts = "flowFonts"
         const val flowTitleFonts = "flowTitleFonts"
+        const val flowSummaryFonts = "flowSummaryFonts"
         const val flowTextFontSize = "flowTextFontSize"
 
         // Reading page
@@ -484,6 +487,8 @@ data class DataStoreKey<T>(val key: Preferences.Key<T>, val type: Class<T>) {
                 flowFonts to DataStoreKey(intPreferencesKey(flowFonts), Int::class.java),
                 flowTitleFonts to
                     DataStoreKey(intPreferencesKey(flowTitleFonts), Int::class.java),
+                flowSummaryFonts to
+                    DataStoreKey(intPreferencesKey(flowSummaryFonts), Int::class.java),
                 flowTextFontSize to
                     DataStoreKey(intPreferencesKey(flowTextFontSize), Int::class.java),
                 // Reading page

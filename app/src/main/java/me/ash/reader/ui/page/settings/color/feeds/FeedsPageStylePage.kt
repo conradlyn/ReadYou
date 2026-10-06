@@ -22,6 +22,8 @@ import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.*
 import me.ash.reader.infrastructure.preference.FeedsTextFontSizePreference.coerceToRange
 import me.ash.reader.ui.component.base.*
+import me.ash.reader.ui.component.importFontOption
+import me.ash.reader.ui.component.importedFontName
 import me.ash.reader.ui.ext.ListExternalFonts
 import me.ash.reader.ui.ext.MimeType
 import me.ash.reader.ui.ext.showToast
@@ -141,15 +143,10 @@ fun FeedsPageStylePage(
                         desc = "${fontSize}sp",
                         onClick = { fontSizeDialogVisible = true },
                     ) {}
-                    SettingItem(
-                        title = stringResource(R.string.import_font),
-                        desc =
-                            stringResource(
-                                if (hasImportedFont) R.string.imported else R.string.not_imported
-                            ),
-                        onClick = { fontLauncher.launch(arrayOf(MimeType.FONT)) },
-                    ) {}
-                    Tips(text = stringResource(R.string.tips_list_external_fonts))
+                    // The import row that used to sit here is now the last option of the dialog
+                    // above, so that it can say which font it holds. The tip stays: that each row
+                    // imports a file of its own is the part that is not obvious from the dialog.
+                    Tips(text = stringResource(R.string.tips_import_font))
                     Spacer(modifier = Modifier.height(24.dp))
                 }
 
@@ -299,15 +296,25 @@ fun FeedsPageStylePage(
         visible = fontsDialogVisible,
         title = stringResource(R.string.list_fonts),
         options = ListFontsPreference.values.map {
-            RadioDialogOption(
-                text = it.toDesc(context),
-                style =
-                    it.asFontFamily(context, ListExternalFonts.Slot.Feeds)?.let { family ->
-                        TextStyle(fontFamily = family)
-                    },
-                selected = it == fonts,
-            ) {
-                FeedsFontsPreference.put(context, scope, it)
+            if (it == ListFontsPreference.External) {
+                importFontOption(
+                    selected = fonts == ListFontsPreference.External,
+                    imported = hasImportedFont,
+                    name = importedFontName(ListExternalFonts.Slot.Feeds.fileName, fontGeneration),
+                    fontFamily = it.asFontFamily(context, ListExternalFonts.Slot.Feeds),
+                    onImport = { fontLauncher.launch(arrayOf(MimeType.FONT)) },
+                )
+            } else {
+                RadioDialogOption(
+                    text = it.toDesc(context),
+                    style =
+                        it.asFontFamily(context, ListExternalFonts.Slot.Feeds)?.let { family ->
+                            TextStyle(fontFamily = family)
+                        },
+                    selected = it == fonts,
+                ) {
+                    FeedsFontsPreference.put(context, scope, it)
+                }
             }
         }
     ) {

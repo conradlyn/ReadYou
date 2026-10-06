@@ -58,14 +58,18 @@ sealed class TitleFontsPreference(val value: Int) {
      * Same as [asFontFamily], except that [External] resolves to [externalSlot]'s imported font
      * rather than the reading page's.
      *
-     * This enum is shared by the flow page's title and the reading page's title, so [External]
-     * cannot mean one fixed font. The flow page passes its own slot, which is what lets its title
-     * row honour the font imported on that page; the reading page keeps the single-argument overload
-     * and therefore keeps meaning the reading font, unchanged.
+     * This enum is shared by the title rows of the flow and reading pages and by the flow page's
+     * summary row, so [External] cannot mean one fixed font. Each caller passes its own slot, which
+     * is what lets a row honour the file imported on that row.
+     *
+     * `null` therefore has two meanings, and every caller treats them the same way: [Follow], and
+     * [External] on a row with nothing imported yet. Both fall back to the page's own font - which
+     * for the reading page's title is the reading font, the very file that row used before it had a
+     * slot of its own, so an existing `External` title keeps its appearance.
      */
     fun asFontFamily(context: Context, externalSlot: ListExternalFonts.Slot): FontFamily? =
         if (this == External) {
-            ListExternalFonts.load(context, externalSlot) ?: FontFamily.Default
+            ListExternalFonts.load(context, externalSlot)
         } else {
             asFontFamily(context)
         }
@@ -79,7 +83,7 @@ sealed class TitleFontsPreference(val value: Int) {
             SansSerif -> "Sans-Serif"
             Monospace -> "Monospace"
             Cursive -> "Cursive"
-            External -> context.getString(R.string.external_fonts)
+            External -> context.getString(R.string.import_font)
         }
 
     companion object {

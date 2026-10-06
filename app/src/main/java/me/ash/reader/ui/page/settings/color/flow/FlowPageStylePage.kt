@@ -22,6 +22,8 @@ import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.*
 import me.ash.reader.infrastructure.preference.FlowTextFontSizePreference.coerceToRange
 import me.ash.reader.ui.component.base.*
+import me.ash.reader.ui.component.importFontOption
+import me.ash.reader.ui.component.importedFontName
 import me.ash.reader.ui.ext.ListExternalFonts
 import me.ash.reader.ui.ext.MimeType
 import me.ash.reader.ui.ext.showToast
@@ -51,6 +53,7 @@ fun FlowPageStylePage(
     val markAllAsReadWithoutConfirm = LocalMarkAllAsReadWithoutConfirm.current
     val fonts = LocalFlowFonts.current
     val titleFonts = LocalFlowTitleFonts.current
+    val summaryFonts = LocalFlowSummaryFonts.current
     val fontSize = LocalFlowTextFontSize.current
 
     val settings = LocalSettings.current
@@ -74,14 +77,25 @@ fun FlowPageStylePage(
 
     var fontsDialogVisible by remember { mutableStateOf(false) }
     var titleFontsDialogVisible by remember { mutableStateOf(false) }
+    var summaryFontsDialogVisible by remember { mutableStateOf(false) }
 
-    // Read so that the import row below re-reads the slot after an import. The file appears on disk
-    // before the preference changes, and re-importing into an already-`External` slot changes no
-    // preference at all, so the generation counter is the only reliable invalidation.
+    // Read so that each dialog's import row re-reads its own slot after an import. The file appears
+    // on disk before the preference changes, and re-importing into an already-`External` slot
+    // changes no preference at all, so the generation counter is the only reliable invalidation.
     val fontGeneration = ListExternalFonts.generation(ListExternalFonts.Slot.Flow)
+    val titleFontGeneration = ListExternalFonts.generation(ListExternalFonts.Slot.FlowTitle)
+    val summaryFontGeneration = ListExternalFonts.generation(ListExternalFonts.Slot.FlowSummary)
     val hasImportedFont =
         remember(fontGeneration) {
             ListExternalFonts.hasFont(context, ListExternalFonts.Slot.Flow)
+        }
+    val hasImportedTitleFont =
+        remember(titleFontGeneration) {
+            ListExternalFonts.hasFont(context, ListExternalFonts.Slot.FlowTitle)
+        }
+    val hasImportedSummaryFont =
+        remember(summaryFontGeneration) {
+            ListExternalFonts.hasFont(context, ListExternalFonts.Slot.FlowSummary)
         }
 
     val fontLauncher =
@@ -91,6 +105,22 @@ fun FlowPageStylePage(
                 // Also selects External: importing a font and then leaving the page on a different
                 // family would look exactly like the import having failed.
                 FlowFontsPreference.put(context, scope, ListFontsPreference.External)
+            } ?: context.showToast("Cannot get activity result with launcher")
+        }
+
+    val titleFontLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let {
+                ListExternalFonts.import(context, it, ListExternalFonts.Slot.FlowTitle)
+                FlowTitleFontsPreference.put(context, scope, TitleFontsPreference.External)
+            } ?: context.showToast("Cannot get activity result with launcher")
+        }
+
+    val summaryFontLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let {
+                ListExternalFonts.import(context, it, ListExternalFonts.Slot.FlowSummary)
+                FlowSummaryFontsPreference.put(context, scope, TitleFontsPreference.External)
             } ?: context.showToast("Cannot get activity result with launcher")
         }
     var fontSizeDialogVisible by remember { mutableStateOf(false) }
@@ -159,27 +189,27 @@ fun FlowPageStylePage(
                         desc = fonts.toDesc(context),
                         onClick = { fontsDialogVisible = true },
                     ) {}
-                    // The list row above stays the page-wide font, so it is what the summary
-                    // follows and what this row falls back to.
+                    // The list row above stays the page-wide font, so it is what the two rows below
+                    // follow and what they fall back to.
                     SettingItem(
                         title = stringResource(R.string.title_fonts),
                         desc = titleFonts.toDesc(context),
                         onClick = { titleFontsDialogVisible = true },
                     ) {}
                     SettingItem(
+                        title = stringResource(R.string.summary_fonts),
+                        desc = summaryFonts.toDesc(context),
+                        onClick = { summaryFontsDialogVisible = true },
+                    ) {}
+                    SettingItem(
                         title = stringResource(R.string.font_size),
                         desc = "${fontSize}sp",
                         onClick = { fontSizeDialogVisible = true },
                     ) {}
-                    SettingItem(
-                        title = stringResource(R.string.import_font),
-                        desc =
-                            stringResource(
-                                if (hasImportedFont) R.string.imported else R.string.not_imported
-                            ),
-                        onClick = { fontLauncher.launch(arrayOf(MimeType.FONT)) },
-                    ) {}
-                    Tips(text = stringResource(R.string.tips_list_external_fonts))
+                    // The import row that used to sit here is now the last option of each dialog
+                    // above, so that it can say which font it holds. The tip stays: that every font
+                    // row imports a file of its own is the part not obvious from the dialog.
+                    Tips(text = stringResource(R.string.tips_import_font))
                     Spacer(modifier = Modifier.height(24.dp))
                 }
 
@@ -510,15 +540,25 @@ fun FlowPageStylePage(
         visible = fontsDialogVisible,
         title = stringResource(R.string.list_fonts),
         options = ListFontsPreference.values.map {
-            RadioDialogOption(
-                text = it.toDesc(context),
-                style =
-                    it.asFontFamily(context, ListExternalFonts.Slot.Flow)?.let { family ->
-                        TextStyle(fontFamily = family)
-                    },
-                selected = it == fonts,
-            ) {
-                FlowFontsPreference.put(context, scope, it)
+            if (it == ListFontsPreference.External) {
+                importFontOption(
+                    selected = fonts == ListFontsPreference.External,
+                    imported = hasImportedFont,
+                    name = importedFontName(ListExternalFonts.Slot.Flow.fileName, fontGeneration),
+                    fontFamily = it.asFontFamily(context, ListExternalFonts.Slot.Flow),
+                    onImport = { fontLauncher.launch(arrayOf(MimeType.FONT)) },
+                )
+            } else {
+                RadioDialogOption(
+                    text = it.toDesc(context),
+                    style =
+                        it.asFontFamily(context, ListExternalFonts.Slot.Flow)?.let { family ->
+                            TextStyle(fontFamily = family)
+                        },
+                    selected = it == fonts,
+                ) {
+                    FlowFontsPreference.put(context, scope, it)
+                }
             }
         }
     ) {
@@ -529,19 +569,66 @@ fun FlowPageStylePage(
         visible = titleFontsDialogVisible,
         title = stringResource(R.string.title_fonts),
         options = TitleFontsPreference.values.map {
-            RadioDialogOption(
-                text = it.toDesc(context),
-                style =
-                    it.asFontFamily(context, ListExternalFonts.Slot.Flow)?.let { family ->
-                        TextStyle(fontFamily = family)
-                    },
-                selected = it == titleFonts,
-            ) {
-                FlowTitleFontsPreference.put(context, scope, it)
+            if (it == TitleFontsPreference.External) {
+                importFontOption(
+                    selected = titleFonts == TitleFontsPreference.External,
+                    imported = hasImportedTitleFont,
+                    name =
+                        importedFontName(
+                            ListExternalFonts.Slot.FlowTitle.fileName,
+                            titleFontGeneration,
+                        ),
+                    fontFamily = it.asFontFamily(context, ListExternalFonts.Slot.FlowTitle),
+                    onImport = { titleFontLauncher.launch(arrayOf(MimeType.FONT)) },
+                )
+            } else {
+                RadioDialogOption(
+                    text = it.toDesc(context),
+                    style =
+                        it.asFontFamily(context, ListExternalFonts.Slot.FlowTitle)?.let { family ->
+                            TextStyle(fontFamily = family)
+                        },
+                    selected = it == titleFonts,
+                ) {
+                    FlowTitleFontsPreference.put(context, scope, it)
+                }
             }
         }
     ) {
         titleFontsDialogVisible = false
+    }
+
+    RadioDialog(
+        visible = summaryFontsDialogVisible,
+        title = stringResource(R.string.summary_fonts),
+        options = TitleFontsPreference.values.map {
+            if (it == TitleFontsPreference.External) {
+                importFontOption(
+                    selected = summaryFonts == TitleFontsPreference.External,
+                    imported = hasImportedSummaryFont,
+                    name =
+                        importedFontName(
+                            ListExternalFonts.Slot.FlowSummary.fileName,
+                            summaryFontGeneration,
+                        ),
+                    fontFamily = it.asFontFamily(context, ListExternalFonts.Slot.FlowSummary),
+                    onImport = { summaryFontLauncher.launch(arrayOf(MimeType.FONT)) },
+                )
+            } else {
+                RadioDialogOption(
+                    text = it.toDesc(context),
+                    style =
+                        it.asFontFamily(context, ListExternalFonts.Slot.FlowSummary)?.let { family ->
+                            TextStyle(fontFamily = family)
+                        },
+                    selected = it == summaryFonts,
+                ) {
+                    FlowSummaryFontsPreference.put(context, scope, it)
+                }
+            }
+        }
+    ) {
+        summaryFontsDialogVisible = false
     }
 
     TextFieldDialog(

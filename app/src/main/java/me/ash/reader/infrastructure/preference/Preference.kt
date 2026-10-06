@@ -55,6 +55,7 @@ fun Preferences.toSettings(): Settings {
         flowSortUnreadArticles = SortUnreadArticlesPreference.fromPreferences(this),
         flowFonts = FlowFontsPreference.fromPreferences(this),
         flowTitleFonts = FlowTitleFontsPreference.fromPreferences(this),
+        flowSummaryFonts = FlowSummaryFontsPreference.fromPreferences(this),
         flowTextFontSize = FlowTextFontSizePreference.fromPreferences(this),
 
         // Reading page

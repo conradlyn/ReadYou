@@ -78,6 +78,7 @@ import me.ash.reader.ui.component.menu.AnimatedDropdownMenu
 import me.ash.reader.ui.component.swipe.SwipeAction
 import me.ash.reader.ui.component.swipe.SwipeableActionsBox
 import me.ash.reader.ui.component.withFlowListStyle
+import me.ash.reader.ui.component.withFlowSummaryStyle
 import me.ash.reader.ui.component.withFlowTitleStyle
 import me.ash.reader.ui.ext.requiresBidi
 import me.ash.reader.ui.ext.surfaceColorAtElevation
@@ -267,7 +268,7 @@ fun ArticleItem(
                         style =
                             MaterialTheme.typography.bodySmall.applyTextDirection(
                                 shortDescription.requiresBidi()
-                            ).withFlowListStyle(),
+                            ).withFlowSummaryStyle(),
                         maxLines =
                             when (articleListDesc) {
                                 FlowArticleListDescPreference.LONG -> 4

@@ -150,6 +150,7 @@
     <string name="reading_fonts">Reading fonts</string>
     <string name="list_fonts">List fonts</string>
     <string name="basic_fonts">Basic fonts</string>
+    <string name="app_interface_fonts">App interface font</string>
     <string name="google_sans" translatable="false">Google Sans Flex</string>
     <string name="feeds_page">Feeds page</string>
     <string name="flow_page">Flow page</string>
@@ -201,6 +202,7 @@
     <string name="tips_article_list_tonal_elevation">Tonal elevation for the article list is only available in the light theme</string>
     <string name="tips_group_list_tonal_elevation">Tonal elevation for the group list is only available in the light theme</string>
     <string name="tips_list_external_fonts">"External fonts" uses the .ttf file you import for this page</string>
+    <string name="tips_import_font">Every font row imports a .ttf file of its own</string>
     <string name="share">Share</string>
     <string name="touch_to_play_video">Tap to play a video</string>
     <string name="text">Text</string>
@@ -391,6 +393,7 @@
     <string name="enable">Enable</string>
     <string name="disable">Disable</string>
     <string name="title_fonts">Title font</string>
+    <string name="summary_fonts">Summary font</string>
     <string name="follow_page_font">Same as the page font</string>
     <string name="auto_fetch_full_content">Fetch full content on open</string>
     <string name="auto_fetch_full_content_desc">Fetch the full article from its webpage as soon as it opens, instead of tapping \"Parse full content\"</string>

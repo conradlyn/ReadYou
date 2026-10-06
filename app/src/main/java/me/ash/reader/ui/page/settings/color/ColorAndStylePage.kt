@@ -78,7 +78,11 @@ import me.ash.reader.ui.component.base.RadioDialog
 import me.ash.reader.ui.component.base.RadioDialogOption
 import me.ash.reader.ui.component.base.Subtitle
 import me.ash.reader.ui.component.base.TextFieldDialog
+import me.ash.reader.ui.component.hasImportedFont
+import me.ash.reader.ui.component.importFontOption
+import me.ash.reader.ui.component.importedFontName
 import me.ash.reader.ui.ext.ExternalFonts
+import me.ash.reader.ui.ext.FontNames
 import me.ash.reader.ui.ext.MimeType
 import me.ash.reader.ui.ext.showToast
 import me.ash.reader.ui.page.settings.SettingItem
@@ -112,11 +116,18 @@ fun ColorAndStylePage(
     val wallpaperTonalPalettes = extractTonalPalettesFromUserWallpaper()
     var radioButtonSelected by remember { mutableStateOf(if (themeIndex > 4) 0 else 1) }
     var fontsDialogVisible by remember { mutableStateOf(false) }
+    // Bumped after every import so the dialog re-reads the font's own name; see `importedFontName`.
+    var importTick by remember { mutableStateOf(0) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
             ExternalFonts(context, it, ExternalFonts.FontType.BasicFont).copyToInternalStorage()
+            // The sidecar is what lets the dialog say which font this row is on rather than only
+            // "Imported". Recording it also has to happen here rather than in ExternalFonts, which
+            // knows nothing about names.
+            FontNames.record(context, ExternalFonts.FontType.BasicFont.value, it)
             BasicFontsPreference.External.put(context, scope)
+            importTick++
         } ?: context.showToast("Cannot get activity result with launcher")
     }
 
@@ -213,7 +224,7 @@ fun ColorAndStylePage(
                         }
                     }
                     SettingItem(
-                        title = stringResource(R.string.basic_fonts),
+                        title = stringResource(R.string.app_interface_fonts),
                         desc = fonts.toDesc(context),
                         onClick = { fontsDialogVisible = true },
                     ) {}
@@ -248,16 +259,24 @@ fun ColorAndStylePage(
 
     RadioDialog(
         visible = fontsDialogVisible,
-        title = stringResource(R.string.basic_fonts),
+        title = stringResource(R.string.app_interface_fonts),
         options = BasicFontsPreference.values.map {
-            RadioDialogOption(
-                text = it.toDesc(context),
-                style = TextStyle(fontFamily = it.asFontFamily(context)),
-                selected = it == fonts,
-            ) {
-                if (it.value == BasicFontsPreference.External.value) {
-                    launcher.launch(arrayOf(MimeType.FONT))
-                } else {
+            if (it == BasicFontsPreference.External) {
+                // The one row that paints the whole app, so it keeps the app-wide font slot rather
+                // than one of the per-page ones.
+                importFontOption(
+                    selected = fonts == BasicFontsPreference.External,
+                    imported = hasImportedFont(context, ExternalFonts.FontType.BasicFont),
+                    name = importedFontName(ExternalFonts.FontType.BasicFont.value, importTick),
+                    fontFamily = it.asFontFamily(context),
+                    onImport = { launcher.launch(arrayOf(MimeType.FONT)) },
+                )
+            } else {
+                RadioDialogOption(
+                    text = it.toDesc(context),
+                    style = TextStyle(fontFamily = it.asFontFamily(context)),
+                    selected = it == fonts,
+                ) {
                     it.put(context, scope)
                 }
             }

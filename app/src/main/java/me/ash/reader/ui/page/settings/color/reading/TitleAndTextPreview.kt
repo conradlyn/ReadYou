@@ -20,9 +20,11 @@ import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 import me.ash.reader.R
 import me.ash.reader.infrastructure.preference.*
+import me.ash.reader.ui.component.overridingFontFamily
 import me.ash.reader.ui.component.reader.bodyStyle
 import me.ash.reader.ui.component.reader.h3Style
 import me.ash.reader.ui.component.reader.textHorizontalPadding
+import me.ash.reader.ui.ext.ListExternalFonts
 
 @Composable
 fun TitleAndTextPreview() {
@@ -55,8 +57,10 @@ fun TitleAndTextPreview() {
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontFamily =
-                    LocalReadingTitleFonts.current.asFontFamily(context)
-                        ?: LocalReadingFonts.current.asFontFamily(context),
+                    overridingFontFamily(
+                        LocalReadingTitleFonts.current,
+                        ListExternalFonts.Slot.ReadingTitle,
+                    ) ?: LocalReadingFonts.current.asFontFamily(context),
                 fontWeight = if (titleBold.value) FontWeight.Bold else FontWeight.Medium,
             ),
             textAlign = titleAlign.toTextAlign(),
