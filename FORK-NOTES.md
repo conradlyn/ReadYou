@@ -492,6 +492,17 @@ navigationIcon = {
   同时序号计算带重试（每轮先 `git fetch --tags --force` 再取 max+1），
   万一并行算出同一个号，`git push` 被拒后重算，最多 5 次。
 - **不留半成品**：先 build，成功后才建 tag、才建 release。构建失败 → 不产生 tag、不产生空 release。
+- **三个工作流的并发策略并不一致**（实测 2026-10-06，连续两次 push）：
+
+  | 工作流 | `concurrency` | 连续两次 push |
+  |---|---|---|
+  | `build_commit.yaml` | **无该块** | 两次构建都跑 |
+  | `fork-unit-tests.yaml` | `cancel-in-progress: true` | **取消**前一次 |
+  | `fork-auto-release.yaml` | `cancel-in-progress: false` | 排队，前一次仍完成 |
+
+  所以"代码 push 完立刻补文档"会让**代码那次提交的单测 run 变成 `Cancelled`**（看起来像失败，其实是被取代）。
+  提交是累积的，后一次的 run 覆盖前一次的全部代码，验证无缺口 —— 但**读结论必须按"最后一次 push"看**。
+  要拿到某个提交自己的单测结论，就得等它跑完再推下一次，或对 `fork-unit-tests.yaml` 手动 `workflow_dispatch`。
 
 ### 7.4 什么时候还会用到 `release-build.yaml`（手动）
 
@@ -507,6 +518,8 @@ navigationIcon = {
   **但 `build_commit.yaml` 与 `fork-unit-tests.yaml` 没有这个过滤器**（两者都是裸 `on: push`）
   —— 实测（2026-10-06，提交 `8992c247`）它们照跑，耗时 **7m33s + 2m42s**。
   所以「补文档」省掉的**只是 release，不是 CI**；想省轮次仍然只能把文档并进代码那次 push。
+  而且**分开推还有一个副作用**：`fork-unit-tests.yaml` 带 `cancel-in-progress: true`，
+  补文档会把代码那次提交的单测 run **取消**掉（详见 §7.3 的并发策略表）。
   （此处曾误记成"纯文档零成本"，错在拿 `releases` 页的结论去推断 `actions` 有没有跑。）
 - tag 序号来自仓库**已有 tag**，不来自 `versionCode`（`47` 目前不变）。所以升级 versionName 时
   序号会从头开始（`v0.16.3-tablet.1`），这是刻意的：序号只表示"本 version 内的第几个预览包"。
@@ -1220,6 +1233,31 @@ git 按行合并时那是最强的冲突磁铁。
 被 `strip_kotlin` 当成字符字面量的起始，一路吞到文件尾，于是**一个完全平衡的文件报出
 "1 个未闭合 `{`"**。修法是让 `strip_kotlin` 跳过反引号标识符。
 **判据：报"未闭合"时先人工数一遍那段括号，再决定改代码还是改脚本。**
+
+#### CI 结论（2026-10-06）
+
+- **编译通过**：`Fork Auto Release (on push)` #16 从 `b83d797` 构建成功，
+  产出 **`v0.16.2-tablet.17`**（它跑的是 `assembleGithubRelease`，这是真正的编译证据）。
+- **单测通过**：`Unit Tests (on push)` #30（提交 `30ba5f5`）= **Success**，3m46s。
+- ⚠️ **但 `b83d797` 自己那一次单测被取消了**：`Unit Tests #29` = **Cancelled**，注解原文
+  `Canceling since a higher priority waiting request for Unit Tests (on push)-refs/heads/main exists`。
+  原因是本 fork 推了两次（代码 → 文档），而 `fork-unit-tests.yaml` 带
+  `concurrency: cancel-in-progress: true`，**后一次 push 会取消前一次的 run**。
+  三个工作流的并发策略并不一致：
+
+  | 工作流 | `concurrency` | 两次连续 push 的行为 |
+  |---|---|---|
+  | `build_commit.yaml` | **无该块** | 两次构建**都跑**，互不取消 |
+  | `fork-unit-tests.yaml` | `cancel-in-progress: true` | **取消**前一次（前一次的结论作废） |
+  | `fork-auto-release.yaml` | `cancel-in-progress: false` | **排队**，前一次仍会完成并发版 |
+
+  **推论（重要）**：因为提交是累积的，后一次 push 的 run 覆盖前一次的全部代码，
+  所以只要**让最后一次 push 的 run 跑完**，验证就没有缺口 —— 本例中 `30ba5f5` 的 `Unit Tests`
+  覆盖了 `b83d797` 的改动。
+  **但"某个提交自己的 CI 全绿"这个说法会因此不成立**，查结论时必须按"最后一个提交"去看，
+  否则会误读成"被取消 = 失败"。
+  **若确实需要 `b83d797` 自己那一轮的单测结论**：等单测跑完再推文档，或对 `fork-unit-tests.yaml`
+  用 `workflow_dispatch` 手动补跑。
 
 #### 上游同步后要核验的
 
