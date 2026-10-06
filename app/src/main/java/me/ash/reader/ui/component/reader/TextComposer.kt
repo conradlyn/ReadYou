@@ -29,6 +29,11 @@ import androidx.compose.ui.util.fastLastOrNull
 
 class TextComposer(
     val paragraphEmitter: (AnnotatedParagraphStringBuilder) -> Unit,
+    /**
+     * Prepended to every paragraph this composer emits. Empty by default, so composers that do not
+     * want an indent - the code-block one, for instance - need no change.
+     */
+    val paragraphIndent: String = "",
 ) {
 
     val spanStack: MutableList<Span> = mutableListOf()

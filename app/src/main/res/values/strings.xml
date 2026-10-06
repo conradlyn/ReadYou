@@ -180,6 +180,8 @@
     <string name="preview_feed_name">Reddit</string>
     <string name="value">value</string>
     <string name="horizontal_padding">Horizontal padding</string>
+    <string name="paragraph_indent">Paragraph indent</string>
+    <string name="paragraph_indent_desc">Chinese articles only</string>
     <string name="article_date">Article publication time</string>
     <string name="article_desc">Article descriptions</string>
     <string name="article_images">Article images</string>

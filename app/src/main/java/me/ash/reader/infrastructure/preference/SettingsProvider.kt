@@ -134,6 +134,7 @@ class SettingsProvider @Inject constructor(
             LocalReadingImageHorizontalPadding provides settings.readingImageHorizontalPadding,
             LocalReadingImageRoundedCorners provides settings.readingImageRoundedCorners,
             LocalReadingImageMaximize provides settings.readingImageMaximize,
+            LocalReadingParagraphIndent provides settings.readingParagraphIndent,
 
             // Interaction
             LocalInitialPage provides settings.initialPage,

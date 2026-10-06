@@ -17,17 +17,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import java.util.Date
+import me.ash.reader.infrastructure.preference.LocalReadingParagraphIndent
 import me.ash.reader.infrastructure.preference.LocalReadingRenderer
 import me.ash.reader.infrastructure.preference.LocalReadingSubheadUpperCase
 import me.ash.reader.infrastructure.preference.ReadingRendererPreference
 import me.ash.reader.ui.component.reader.LocalTextContentWidth
 import me.ash.reader.ui.component.reader.Reader
+import me.ash.reader.ui.component.reader.isChineseDominant
+import me.ash.reader.ui.component.reader.paragraphIndentCss
+import me.ash.reader.ui.component.reader.paragraphIndentText
 import me.ash.reader.ui.component.scrollbar.drawVerticalScrollIndicator
 import me.ash.reader.ui.component.webview.RYWebView
 import me.ash.reader.ui.ext.extractDomain
@@ -52,6 +57,13 @@ fun Content(
     val context = LocalContext.current
     val subheadUpperCase = LocalReadingSubheadUpperCase.current
     val renderer = LocalReadingRenderer.current
+
+    // One verdict, read by both renderers below. The WebView stylesheet wants a CSS length and the
+    // native reader wants the characters themselves, but they must never disagree about whether
+    // this article is indented at all. Reading the whole body is cheap next to rendering it, and
+    // `remember` keeps it off the recomposition path.
+    val paragraphIndentEnabled = LocalReadingParagraphIndent.current.value
+    val isChinese = remember(content) { isChineseDominant(content) }
 
     val textContentWidth = LocalTextContentWidth.current
     val maxWidthModifier = Modifier.widthIn(max = textContentWidth)
@@ -100,6 +112,7 @@ fun Content(
                                 content = content,
                                 refererDomain = link.extractDomain(),
                                 onImageClick = onImageClick,
+                                paragraphIndent = paragraphIndentCss(paragraphIndentEnabled, isChinese),
                             )
                             Spacer(modifier = Modifier.height(128.dp))
                             Spacer(
@@ -132,6 +145,7 @@ fun Content(
                             content = content,
                             onImageClick = onImageClick,
                             onLinkClick = { uriHandler.openUri(it) },
+                            paragraphIndent = paragraphIndentText(paragraphIndentEnabled, isChinese),
                         )
 
                         item {

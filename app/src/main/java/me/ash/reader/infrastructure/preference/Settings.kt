@@ -75,6 +75,7 @@ data class Settings(
     val readingImageHorizontalPadding: Int = ReadingImageHorizontalPaddingPreference.default,
     val readingImageRoundedCorners: Int = ReadingImageRoundedCornersPreference.default,
     val readingImageMaximize: ReadingImageMaximizePreference = ReadingImageMaximizePreference.default,
+    val readingParagraphIndent: ReadingParagraphIndentPreference = ReadingParagraphIndentPreference.default,
 
     // Interaction
     val initialPage: InitialPagePreference = InitialPagePreference.default,

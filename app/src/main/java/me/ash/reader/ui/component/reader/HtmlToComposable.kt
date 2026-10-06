@@ -67,6 +67,7 @@ fun LazyListScope.htmlFormattedText(
     @DrawableRes imagePlaceholder: Int,
     onImageClick: ((imgUrl: String, altText: String) -> Unit)? = null,
     onLinkClick: (String) -> Unit,
+    paragraphIndent: String = "",
 ) {
     Jsoup.parse(inputStream, null, baseUrl)?.body()?.let { body ->
         formatBody(
@@ -76,6 +77,7 @@ fun LazyListScope.htmlFormattedText(
             onImageClick = onImageClick,
             onLinkClick = onLinkClick,
             baseUrl = baseUrl,
+            paragraphIndent = paragraphIndent,
         )
     }
 }
@@ -88,8 +90,11 @@ private fun LazyListScope.formatBody(
     onImageClick: ((imgUrl: String, altText: String) -> Unit)? = null,
     onLinkClick: (String) -> Unit,
     baseUrl: String,
+    paragraphIndent: String = "",
 ) {
-    val composer = TextComposer { paragraphBuilder ->
+    val composer = TextComposer(
+        paragraphIndent = paragraphIndent,
+    ) { paragraphBuilder ->
         item {
             val textLinkStyles = textLinkStyles()
             val paragraph =
@@ -231,6 +236,13 @@ private fun TextComposer.appendTextChildren(
                             )
                         } else {
                             withParagraph {
+                                // Only body paragraphs reach this point: headings, list items and
+                                // quotes build their own paragraphs, so they keep their own layout.
+                                // A paragraph whose whole content is an image counts as blank here,
+                                // which is what keeps the indent off the image.
+                                if (paragraphIndent.isNotEmpty() && element.text().isNotBlank()) {
+                                    append(paragraphIndent)
+                                }
                                 appendTextChildren(
                                     element.childNodes(),
                                     lazyListScope = lazyListScope,

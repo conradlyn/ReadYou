@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.ash.reader.R
+import me.ash.reader.infrastructure.preference.LocalReadingParagraphIndent
 import me.ash.reader.infrastructure.preference.LocalReadingTextLetterSpacing
 import me.ash.reader.infrastructure.preference.LocalReadingTextAlign
 import me.ash.reader.infrastructure.preference.LocalReadingTextBold
@@ -70,6 +71,7 @@ fun ReadingTextPage(
     val horizontalPadding = LocalReadingTextHorizontalPadding.current
     val align = LocalReadingTextAlign.current
     val bold = LocalReadingTextBold.current
+    val paragraphIndent = LocalReadingParagraphIndent.current
 
     var fontSizeDialogVisible by remember { mutableStateOf(false) }
     var lineHeightDialogVisible by remember { mutableStateOf(false) }
@@ -163,6 +165,19 @@ fun ReadingTextPage(
                         desc = align.toDesc(context),
                         onClick = { alignDialogVisible = true },
                     ) {}
+                    SettingItem(
+                        title = stringResource(R.string.paragraph_indent),
+                        desc = stringResource(R.string.paragraph_indent_desc),
+                        onClick = {
+                            (!paragraphIndent).put(context, scope)
+                            ReadingThemePreference.Custom.put(context, scope)
+                        },
+                    ) {
+                        RYSwitch(activated = paragraphIndent.value) {
+                            (!paragraphIndent).put(context, scope)
+                            ReadingThemePreference.Custom.put(context, scope)
+                        }
+                    }
                 }
 
                 item {

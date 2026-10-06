@@ -40,6 +40,7 @@ fun RYWebView(
     content: String,
     refererDomain: String? = null,
     onImageClick: ((imgUrl: String, altText: String) -> Unit)? = null,
+    paragraphIndent: String = "",
 ) {
     val context = LocalContext.current
     val maxWidth = LocalConfiguration.current.screenWidthDp.dp.value
@@ -127,6 +128,7 @@ fun RYWebView(
                             tableMargin = textMargin,
                             selectionTextColor = selectionTextColor,
                             selectionBgColor = selectionBgColor,
+                            paragraphIndent = paragraphIndent,
                         ),
                         url,
                         content,

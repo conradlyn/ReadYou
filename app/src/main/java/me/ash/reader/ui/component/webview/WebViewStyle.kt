@@ -19,6 +19,26 @@ object WebViewStyle {
         --font-family: external;
     """.trimIndent() else ""
 
+    /**
+     * The first-line indent for body paragraphs, or nothing at all.
+     *
+     * Emitting nothing rather than `text-indent: 0` is deliberate: an article that brings its own
+     * indent keeps it when this is off, instead of having it flattened.
+     */
+    private fun applyParagraphIndent(
+        paragraphIndent: String
+    ): String = if (paragraphIndent.isNotEmpty()) """
+        p {
+            text-indent: $paragraphIndent !important;
+        }
+
+        /* A paragraph that opens with an image has that image on the first line, where the indent
+           would shove it sideways instead of indenting text. */
+        p:has(img:first-child) {
+            text-indent: 0 !important;
+        }
+    """.trimIndent() else ""
+
     fun get(
         fontSize: Int,
         fontPath: String? = null,
@@ -39,6 +59,8 @@ object WebViewStyle {
         tableMargin: Int,
         selectionTextColor: Int,
         selectionBgColor: Int,
+        // No default on purpose: this is the one place a missed wire-up can still fail the build.
+        paragraphIndent: String,
     ): String = """
 ${applyFontFace(fontPath)}
 :root {
@@ -129,6 +151,8 @@ p {
     letter-spacing: var(--letter-spacing) !important;
     text-align: var(--text-align) !important;
 }
+
+${applyParagraphIndent(paragraphIndent)}
 
 span {
     line-height: var(--line-height) !important;
