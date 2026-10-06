@@ -39,6 +39,7 @@
 | 平板触控目标 | `ui/adaptive/AdaptiveSizing.kt` 的 `Modifier.adaptiveIconButtonContainer()` + 2 个调用点 | **手机档一个尺寸都不传**；传了会把 48dp 压小，见 §2.2 / §9.8 |
 | 列表行高与内边距 | `GroupItem.kt`(5) / `FeedItem.kt`(4) / `ArticleItem.kt`(10) 处内边距，各包一层 `adaptiveSize()` | 其中 `ArticleItem` 的 `start = 30.dp` 是给 `FeedIcon` 预留的缩进，属**正确性**而非美观，见 §9.8 |
 | 单源视图不重复源名 | `ui/page/home/flow/ArticleFeedName.kt` 的两个纯函数 + `FlowPage.kt` 1 行推导 + `isSingleFeed` 三处透传（ArticleList → SwipeableArticleItem → ArticleItem） | 只在 `feed != null && group == null` 时隐藏。**零缩进改动**，`ArticleItem` 里两处判断收敛为一个 `showFeedName`，见 §9.12 |
+| 阅读页中文首行缩进 | `ui/component/reader/ParagraphIndent.kt` 的 4 个纯函数 + `reading/Content.kt` **1 处**判定 + 两渲染器各 1 处透传（`RYWebView`→`WebViewStyle.get` / `Reader`→`htmlFormattedText`） | 判定只做一次、两渲染器共用结论。原生侧**只改 `"p"` 分支**，标题/列表/引用天然不受影响，见 §9.13 |
 | 界面字号（设置页） | `ui/page/nav3/SettingsNavEntry.kt` 的 `settingsNavEntry()` + `AppEntry.kt` 19 处调用点 | 只包设置类路由；`Feeds`/`Reading`/`Startup`/`else` 保持裸 `NavEntry`，见 §9.9 |
 | 界面字号（对话框） | `ui/component/base/RYDialog.kt` 一处 `ProvideUiTextScale { … }` | 覆盖全部 22 处对话框；另有 5 处直调 `AlertDialog` 已改走 `RYDialog(visible = true, …)`，见 §9.9 |
 | 界面字号的缩放算术 | `ui/theme/UiTextScale.kt` 的 `scaledTypography()` / `uiTextScaleSp()` | **100% 恒等**（返回同一个 `Typography` 实例）；`Typography.copy` 的 30 槽位必须显式传，见 §2.2 / §9.9 |
@@ -50,16 +51,17 @@
 `ui/ext/ListExternalFonts.kt`、`ui/ext/FontNames.kt`、
 `ui/theme/UiTextScale.kt`、`ui/page/nav3/SettingsNavEntry.kt`、
 `ui/page/home/flow/ArticleFeedName.kt`、
+`ui/component/reader/ParagraphIndent.kt`、
 `infrastructure/preference/{Feeds,Flow}{Fonts,TextFontSize}Preference.kt`、
 `ListFontsPreference.kt`、`MarkAsReadButtonPositionPreference.kt`、
 `MarkAllAsReadWithoutConfirmPreference.kt`、`TitleFontsPreference.kt`、
 `{Flow,Reading}TitleFontsPreference.kt`、`FlowSummaryFontsPreference.kt`、
 `ReadingAutoFullContentPreference.kt`、
-`UiTextScalePreference.kt`、
+`UiTextScalePreference.kt`、`ReadingParagraphIndentPreference.kt`、
 `app/src/main/baseline-prof.txt`、四个 workflow、
-9 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
+10 个单测（`ListFontBaselineTest`、`AdaptiveContentWidthTest`、`AppSizeClassTest`、
 `AdaptiveScaleTest`、`OkHttpClientModuleTest`、`UiTextScaleTest`、`FlowPageLeaveTest`、
-`FontNamesTest`、`ArticleFeedNameTest`）。
+`FontNamesTest`、`ArticleFeedNameTest`、`ParagraphIndentTest`）。
 
 ---
 
@@ -399,6 +401,14 @@ navigationIcon = {
 - [ ] **「滚动即已读」不应把页面抽走（关键）**：开启该设置，在「未读」筛选下把列表一路读到底 →
       列表清空时页面**必须留住**，不能在手指还在滑动时被弹回订阅源，见 §9.10
 - [ ] **自动返回落点正确**：返回后应停在订阅源列表（`Feeds`），而不是整个应用退出或停在别处
+- [ ] **阅读页中文首行缩进（关键）**：打开一篇中文文章 → 每个正文段落首行缩进两个字。
+      **标题、小标题、列表项、引用块都不缩进**（缩进只加在 `p` 分支上，见 §9.13）
+- [ ] **英文文章不缩进（关键）**：打开一篇英文文章 → 正文段落顶格，与改动前**完全一致**
+- [ ] **两种渲染器都要看（关键）**：设置 → 颜色和样式 → 阅读页 → 渲染器切成「原生组件」，
+      把上面两条再走一遍。`WebView` 与原生是**两条独立实现**（CSS 与字符前缀），只验一条等于没验
+- [ ] **整段图片不被推歪**：找一篇以整段图片开头的文章 → 图片位置与改动前一致
+      （`WebView` 侧靠 `p:has(img:first-child)` 复位，原生侧靠 `element.text()` 为空跳过）
+- [ ] **缩进开关可关**：设置 → 颜色和样式 → 阅读页 → 正文 → 关掉「首行缩进」→ 中文文章也顶格
 - [ ] **切出去再进来**：字号保持
 - [ ] **无障碍：系统字体 200%** —— 确认文本不被裁切（旧版曾覆写 `LocalDensity`，已移除；这是回归验证）
 - [ ] **外接鼠标**：列表项、图标按钮悬停有反馈
@@ -469,7 +479,7 @@ navigationIcon = {
 | 项 | 取值 | 怎么来的 |
 |---|---|---|
 | tag | `v<versionName>-tablet.<N>` | `versionName` 从 `app/build.gradle.kts` 现读（**不硬编码**，永不与 APK 名漂移）；`N` = 已有同前缀 tag 的最大值 + 1 |
-| release | `--prerelease`，title = tag | 与 `tablet.1/.2/.3` 既有风格一致 |
+| release | **push 触发 = `--prerelease`**；手动触发可取消勾选改出正式版（见 §7.6），title = tag | 与 `tablet.1/.2/.3` 既有风格一致 |
 | notes | 「Built from `<sha>`」+ 上一个 tag 以来的 commit 列表 + 签名说明 | `git log <prev-tag>..<sha>` |
 | asset | `app/build/outputs/apk/github/release/*.apk` | 名形如 `ReadYou-<versionName>-<7位sha>.apk` |
 
@@ -525,6 +535,29 @@ navigationIcon = {
   序号会从头开始（`v0.16.3-tablet.1`），这是刻意的：序号只表示"本 version 内的第几个预览包"。
 - **半成品排查**：若某次 run 建了 tag 但没挂上 release，重跑该 run 不会复用旧 tag（序号已 +1），
   会多出一个空 tag —— 需要手工清理，或直接用 `release-build.yaml` 对着那个 tag 补发。
+
+### 7.6 退出 pre-release：手动触发一次并取消勾选（2026-10-06 加）
+
+`v0.16.2-tablet.1` 到 `.17` 全部是 Pre-release。要把某一次构建变成**正式版**，
+`workflow_dispatch` 上多了一个布尔输入：
+
+| 入口 | `inputs.prerelease` | 结果 |
+|---|---|---|
+| push 到 `main` | 该上下文为空 → 取默认 `true` | `--prerelease`（与以前完全一致） |
+| 手动触发，勾选 | `"true"` | `--prerelease` |
+| 手动触发，**取消勾选** | `"false"` | **不加 `--prerelease`** = 正式版 |
+
+- 操作：Actions → `Fork Auto Release (on push)` → Run workflow → **取消勾选** `Publish as a pre-release` → Run。
+- **为什么必须是手动触发，而不是"改一行让 push 直接出正式版"**：本机没有 `gh`，也没有任何
+  GitHub 令牌（`git remote` 是 SSH，SSH 密钥不授予 API 写权限），所以**无法从本地把已有的
+  Release 从 Pre-release 改成正式版**。走 workflow 是唯一不需要额外凭据的路径。
+- **为什么用开关而不是"删掉 `--prerelease`"**：push 出来的包按语义就该是预览包。把每次 push
+  都变成正式版，会让 `-tablet.N` 这条连续编号的线全是正式版，`Latest` 徽标也会每次乱跳。
+- **注意会多一个 release**：push 自己那次照旧产出 `v0.16.2-tablet.18`（Pre-release），
+  手动那次产出 `.19`（正式版，GitHub 只会把正式版标成 `Latest`）。想只留一个，
+  在 Releases 页面删掉 `.18` 即可 —— 本机没有令牌，删不了，只能由你在网页上点。
+- **`gh release create` 只写一次**：`$prerelease_flag` 故意不加引号，空值要展开成**零个参数**。
+  写成两条 `gh release create` 会让 notes 与 asset 两条路径有机会漂移。
 
 ---
 
@@ -1273,4 +1306,98 @@ git 按行合并时那是最强的冲突磁铁。
 - [ ] `ArticleList` / `SwipeableArticleItem` / `ArticleItem` 的 `isSingleFeed` 参数是否仍被透传。
       上游重构这条链时最容易掉的是 `ArticleList` 的**粘性表头分支**（第二个调用点）。
 - [ ] 三个函数是否仍**全部使用具名参数**被调用。这是"新增参数不会错绑"的前提。
+
+---
+
+### 9.13 阅读页中文首行缩进（2026-10-06，第七轮）
+
+需求：中文正文段落首行缩进两个汉字，**英文文章不要**。顺带把 release 从 pre-release 转正式版（见 §7.6）。
+
+#### 前提：数据层没有语种
+
+`Article` 与 `Feed` **都没有** language 字段，RSS 解析层也从不读 `<language>`。
+所以「是不是中文」只能从正文本身判定 —— 这不是偷懒，而是唯一可得的信号。
+
+#### 关键设计判断
+
+1. **判定只做一次，放在 `reading/Content.kt`。** 两个渲染器各要一种表达
+   （WebView 要 CSS 长度、原生要字符本身），但**必须共用同一个结论**，
+   否则同一篇文章在两种渲染器下会一个缩进一个不缩进。`Content` 是唯一同时看得到
+   `content` 和两个渲染分支的地方，判定就落在这里，用 `remember(content)` 挡住重组。
+2. **原生侧不能改 `bodyStyle()`。** `p` / `h1..h6` / `li` / `blockquote` **全都**走同一个
+   `paragraphEmitter`，在 `bodyStyle()` 上加 `textIndent` 会把标题、小标题、列表项一起缩进，
+   而且因为标题样式是通过 `withComposableStyle` 进 AnnotatedString 的注解，
+   **想再单独复位都很别扭**。所以缩进落在 `HtmlToComposable.kt` 的 `"p"` 分支里 ——
+   只有正文段落会经过那里，标题/列表/引用天然不受影响。
+3. **原生侧用字符前缀（两个 U+3000），不用 `TextIndent`。**
+   `androidx.compose.ui.text.style.TextIndent` 在这个 Compose 版本确实存在，但要用它就得让
+   `paragraphEmitter` 知道"这一段是不是正文"，而发射器是 `p`/`h1..h6`/`li` **共用**的，
+   加标记要么改 `TextComposer` 的构造签名、要么引入自引用，两条都比字符前缀重。
+   两个 U+3000 的宽度恰好 = 2em，**与 CSS 侧的 `2em` 严格等宽**，且随字号与用户导入的 TTF 自动缩放。
+   代价：原生渲染下**复制**段落会把这两个全角空格一起带走（WebView 侧用 CSS `text-indent`，不带）。
+4. **CSS 侧「关」的时候整条规则都不输出**，而不是输出 `text-indent: 0`。
+   后者会**压掉文章自带的缩进**，属于行为回退。`applyParagraphIndent()` 返回 `""`，
+   与同文件既有的 `applyFontFace` / `applyFontFamily` 是同一个套路。
+5. **图片段落要复位**。Readability 会把独占一行的图片包进 `<p>`，此时图片就在**首行**上，
+   `text-indent` 会把它往右推 2em（而它本来就靠负 margin 出血到页边距外，一推就顶出右边界）。
+   用 `p:has(img:first-child)` 把这类段落复位。
+   **`:has()` 需要 Chromium 105+**（2022-08 起）；更老的 WebView 会**丢弃这条规则**，
+   退化成"图片被推歪 2em"，是纯外观问题。原生侧不需要这招 ——
+   `element.text().isNotBlank()` 对纯图片段落返回 false，缩进自然不加。
+6. **语种判定用汉字占比，并用假名守卫排除日文。** 汉字 / (汉字 + 拉丁字母) ≥ **0.2** 判为中文；
+   假名占 (汉字 + 假名) ≥ **0.05** 则判为日文、不缩进（日文规范是缩进 1 字，不是 2 字）。
+   实测分离度极大：中文文章含标记后仍在 **0.8** 上下，英文文章是 **0**。
+   `2em` 而不是 `2ch` —— `ch` 是 "0" 的宽度，约为全角字符的一半。
+
+#### 实现（零缩进改动，116 增 / 4 删）
+
+- **新增** `ui/component/reader/ParagraphIndent.kt`：`isChineseDominant()` /
+  `shouldIndentParagraphs()` / `paragraphIndentText()` / `paragraphIndentCss()`，纯 Kotlin、无 Android 依赖。
+- **新增** `infrastructure/preference/ReadingParagraphIndentPreference.kt`（默认 **ON**），
+  按 §2.6 的 6 处注册。
+- `reading/Content.kt`：1 处判定 + 2 处透传（`paragraphIndentCss` / `paragraphIndentText`）。
+- `ui/component/reader/TextComposer.kt`：构造参数 `paragraphIndent: String = ""`（**带默认值**，
+  所以代码块那个 composer 一个字都不用改）。
+- `ui/component/reader/HtmlToComposable.kt`：`htmlFormattedText` / `formatBody` 各加一个带默认值的参数；
+  `"p"` 分支里加 1 个 `if`。**`appendTextChildren` 的 20 多个递归调用点一处未动** ——
+  它本身就是 `TextComposer` 的扩展，`paragraphIndent` 从 `this` 上直接读得到。
+- `ui/component/reader/Reader.kt`、`ui/component/webview/{RYWebView,WebViewStyle}.kt`：各加一个透传参数。
+  `WebViewStyle.get()` 的 `paragraphIndent` **故意不给默认值** —— 漏接线要变成编译错误，而不是静默失效。
+- `ui/page/settings/color/reading/ReadingTextPage.kt`：正文分区末尾加「首行缩进」开关（带说明「仅对中文文章生效」）。
+- 字符串只补了 `values` / `values-zh-rCN` / `values-zh-rTW` 三份，其余 50 多个语言回落到英文，这是标准回落行为。
+
+#### 刻意没做
+
+- **没动 `Styles.kt`**（原生渲染的 `bodyStyle()`），理由见上文第 2 点。
+- **没给 `BoldCharactersPage` 的预览传缩进**。那里预览的是粗体字符风格，缩进不是它的主题。
+- **没做「手动强制缩进英文」的选项**。用户要的是「英文文章不需要这个缩进」，自动判定已经覆盖。
+- **没动 `WebViewScript` / HTML 内容**。缩进是样式层的事，不往正文里注入字符。
+
+#### 离线核验结果（本机无 JDK，编译只能由 CI 证实）
+
+- 14 个改动文件 + 3 个新文件**括号平衡**全过
+- `assert --contains`：新文件里 6 + 4 条声明全部存在
+- `imports --watch`：`Content.kt` 的 5 个新符号、设置页的 1 个、偏好文件的 5 个**全部显式 import**
+- **交叉核对（第二个实现复算）**：用 Python 重写了判定函数，**12 条单测预期全部一致**；
+  又用 Python 复现了 Kotlin 的 `trimIndent()`，**把 `applyParagraphIndent("2em")` 实际生成的 CSS 打出来**，
+  确认 8 空格源缩进已被剥掉、四条规则齐全（这是最容易出错、又最难靠肉眼看出来的地方）
+- **接线点计数**：6 处注册各恰好 1 次（`const val` 恰好 2 次）、两渲染器各 1 次透传、
+  `HtmlToComposable` 的 2 处传参 + 1 处缩进、`applyParagraphIndent` 恰好被插值 1 次
+- **反向断言**：`h1`~`h6` 分支里**没有**任何 `paragraphIndent`（防误伤标题）
+- **CSS 模板大括号 42/42 平衡**；三个 `strings.xml` 格式良好、无重名键
+- 发布流程：YAML 可解析、`inputs` → `env` → `flag` → `gh release create` 全链路在，
+  且**已无硬编码的 `--prerelease` 行**；用 sh 模拟三种入口，判定结果与 §7.6 表格一致
+
+#### 上游同步后要核验的
+
+- [ ] `HtmlToComposable.kt` 的 `"p"` 分支是否仍是**唯一**的正文段落入口。
+      上游若把段落处理挪走或新增一个段落分支，缩进会静默消失。
+- [ ] `TextComposer` 的 `paragraphEmitter` 是否仍被 `p`/`h1..h6`/`li`/`blockquote` **共用**。
+      这决定了"缩进只加在 `p` 上"这个前提是否还成立。
+- [ ] `Reader` / `htmlFormattedText` / `formatBody` 的 `paragraphIndent` 参数是否仍被透传。
+      三个都带默认值，**漏传不会报错，只会静默不缩进**。
+- [ ] `WebViewStyle.get()` 的 `paragraphIndent` 是否仍**没有**默认值（这是防漏接线的唯一手段）。
+- [ ] `p:has(img:first-child)` 是否还在。上游重写 `p` 规则时这条容易被整段覆盖掉。
+- [ ] `Content.kt` 里 `paragraphIndentEnabled` / `isChinese` 是否仍由**同一个**判定驱动两处透传。
+- [ ] `ReadingParagraphIndentPreference` 的 6 处注册（§2.6）。
 
