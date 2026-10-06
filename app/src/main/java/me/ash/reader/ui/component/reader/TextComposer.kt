@@ -28,12 +28,16 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.util.fastLastOrNull
 
 class TextComposer(
-    val paragraphEmitter: (AnnotatedParagraphStringBuilder) -> Unit,
     /**
      * Prepended to every paragraph this composer emits. Empty by default, so composers that do not
      * want an indent - the code-block one, for instance - need no change.
+     *
+     * Deliberately declared before [paragraphEmitter] rather than after it. A trailing lambda binds
+     * to the *last* parameter, so a parameter of any other type may never be last here: doing so
+     * silently breaks the paren-free `TextComposer { ... }` call in `formatCodeBlock`.
      */
     val paragraphIndent: String = "",
+    val paragraphEmitter: (AnnotatedParagraphStringBuilder) -> Unit,
 ) {
 
     val spanStack: MutableList<Span> = mutableListOf()
