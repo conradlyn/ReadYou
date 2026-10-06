@@ -1527,6 +1527,13 @@ val composer = TextComposer(paragraphIndent = x) { ... }       // ❌ 末位已�
 - 新增 6 个用例**逐个检查过"能不能变红"**：把规则误写成 `preferenceEnabled` 一条，
   会且只会被 `the icon is never drawn in a single-feed flow` 抓住
 
+#### CI 结论（2026-10-06，第九轮）
+
+- **编译通过**：`Build Commit` #44 = **Success**（提交 `9fdef0a5`）。
+- **单测通过**：`Unit Tests (on push)` #36 = **Success**（13 个用例，含本轮新增 6 个）。
+- **产出 release**：`Fork Auto Release (on push)` #20 = **Success** → **`v0.16.2-tablet.20`**（pre-release）。
+- **本次 push 没有被重复**（对照上一轮 `8041aef0` 的两批 run）：三个 workflow 各恰好一次。
+
 #### 上游同步后要核验的
 
 - [ ] `StickyHeader` 的 `isShowFeedIcon` 是否仍用于 `54.dp / 24.dp` 的缩进分支。
