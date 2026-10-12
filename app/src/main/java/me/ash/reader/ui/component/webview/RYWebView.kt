@@ -2,7 +2,6 @@ package me.ash.reader.ui.component.webview
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Ref
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -141,8 +140,10 @@ fun RYWebView(
         }
     val script = remember(boldCharacters) { WebViewScript.get(boldCharacters.value) }
 
-    // What the WebView was last asked to render. See [RenderedDocument].
-    val rendered = remember { Ref<RenderedDocument?>(null) }
+    // What the WebView was last asked to render. See [RenderedDocument]. A plain holder
+    // rather than a Compose state, so writing to it from `update` cannot schedule a
+    // recomposition of its own.
+    val rendered = remember { RenderedDocument() }
 
     AndroidView(
         modifier = modifier,
@@ -159,15 +160,15 @@ fun RYWebView(
             // reload when they are unchanged cannot alter what is on screen. `url` is the
             // WebView's own current address, which is what the <base href> needs; it is read
             // here rather than remembered because only the view knows it.
-            val previous = rendered.value
+            val previous = rendered.document
             if (previous == null ||
                 previous.stylesheet != stylesheet ||
                 previous.script != script ||
                 previous.content != content ||
                 previous.baseUrl != it.url
             ) {
-                rendered.value =
-                    RenderedDocument(
+                rendered.document =
+                    Rendered(
                         stylesheet = stylesheet,
                         script = script,
                         content = content,
@@ -187,13 +188,21 @@ fun RYWebView(
 }
 
 /**
+ * Holds the document a [android.webkit.WebView] was last asked to render.
+ *
+ * Deliberately not Compose state: [update] writes to it, and a snapshot-backed holder would turn
+ * every reload into another recomposition. `remember` already gives it the lifetime it needs.
+ */
+private class RenderedDocument(var document: Rendered? = null)
+
+/**
  * The inputs behind the document currently loaded in a [android.webkit.WebView].
  *
  * [android.webkit.WebView.loadDataWithBaseURL] takes four arguments and produces a document that
  * depends on nothing else, so comparing these is the same test as comparing the rendered HTML -
  * without building that HTML string on every recomposition just to throw it away.
  */
-private class RenderedDocument(
+private class Rendered(
     val stylesheet: String,
     val script: String,
     val content: String,
