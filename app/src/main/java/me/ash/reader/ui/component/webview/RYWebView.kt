@@ -1,15 +1,12 @@
 package me.ash.reader.ui.component.webview
 
-import android.util.Log
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.Ref
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -43,12 +40,9 @@ fun RYWebView(
     paragraphIndent: String = "",
 ) {
     val context = LocalContext.current
-    val maxWidth = LocalConfiguration.current.screenWidthDp.dp.value
     val openLink = LocalOpenLink.current
     val openLinkSpecificBrowser = LocalOpenLinkSpecificBrowser.current
     val tonalElevation = LocalReadingPageTonalElevation.current
-    val backgroundColor =
-        MaterialTheme.colorScheme.surfaceColorAtElevation(tonalElevation.value.dp).toArgb()
     val selectionTextColor = Color.Black.toArgb()
     val selectionBgColor = (MaterialTheme.colorScheme.tertiaryContainer alwaysLight true).toArgb()
     val textColor: Int = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
@@ -70,22 +64,24 @@ fun RYWebView(
         MaterialTheme.colorScheme.surfaceColorAtElevation((tonalElevation.value + 6).dp).toArgb()
     val boldCharacters = LocalReadingBoldCharacters.current
 
-    val webView by
-        remember(backgroundColor) {
-            mutableStateOf(
-                WebViewLayout.get(
-                    context = context,
-                    readingFontsPreference = readingFonts,
-                    webViewClient =
-                        WebViewClient(
-                            context = context,
-                            refererDomain = refererDomain,
-                            onOpenLink = { url ->
-                                context.openURL(url, openLink, openLinkSpecificBrowser)
-                            },
-                        ),
-                    onImageClick = onImageClick,
-                )
+    // One WebView for the lifetime of this composable. It used to be keyed on the surface
+    // colour, which built a fresh instance on every theme change that AndroidView then threw
+    // away - `factory` only ever runs once - so those instances were never attached to a
+    // window and never destroyed. `onRelease` below is what actually frees this one.
+    val webView =
+        remember {
+            WebViewLayout.get(
+                context = context,
+                readingFontsPreference = readingFonts,
+                webViewClient =
+                    WebViewClient(
+                        context = context,
+                        refererDomain = refererDomain,
+                        onOpenLink = { url ->
+                            context.openURL(url, openLink, openLinkSpecificBrowser)
+                        },
+                    ),
+                onImageClick = onImageClick,
             )
         }
 
@@ -96,49 +92,110 @@ fun RYWebView(
             "/android_res/font/google_sans_flex.ttf"
         } else null
 
+    // The stylesheet and the selection script are pure functions of the settings above, so they
+    // are rebuilt when one of those changes rather than on every recomposition.
+    val stylesheet =
+        remember(
+            fontSize,
+            fontPath,
+            lineHeight,
+            letterSpacing,
+            textMargin,
+            textColor,
+            textBold,
+            textAlign,
+            boldTextColor,
+            subheadBold,
+            subheadUpperCase,
+            imgMargin,
+            imgBorderRadius,
+            linkTextColor,
+            codeTextColor,
+            codeBgColor,
+            selectionTextColor,
+            selectionBgColor,
+            paragraphIndent,
+        ) {
+            WebViewStyle.get(
+                fontSize = fontSize,
+                fontPath = fontPath,
+                lineHeight = lineHeight,
+                letterSpacing = letterSpacing,
+                textMargin = textMargin,
+                textColor = textColor,
+                textBold = textBold,
+                textAlign = textAlign,
+                boldTextColor = boldTextColor,
+                subheadBold = subheadBold,
+                subheadUpperCase = subheadUpperCase,
+                imgMargin = imgMargin,
+                imgBorderRadius = imgBorderRadius,
+                linkTextColor = linkTextColor,
+                codeTextColor = codeTextColor,
+                codeBgColor = codeBgColor,
+                tableMargin = textMargin,
+                selectionTextColor = selectionTextColor,
+                selectionBgColor = selectionBgColor,
+                paragraphIndent = paragraphIndent,
+            )
+        }
+    val script = remember(boldCharacters) { WebViewScript.get(boldCharacters.value) }
+
+    // What the WebView was last asked to render. See [RenderedDocument].
+    val rendered = remember { Ref<RenderedDocument?>(null) }
+
     AndroidView(
         modifier = modifier,
         factory = { webView },
-        update = {
-            it.apply {
-                Log.i("RLog", "maxWidth: ${maxWidth}")
-                Log.i("RLog", "readingFont: ${context.filesDir.absolutePath}")
-                Log.i("RLog", "CustomWebView: ${content}")
+        onRelease = { it.destroy() },
+    ) {
+        it.apply {
+            // `update` runs on every recomposition, and this composable recomposes on every
+            // scroll-direction change, because the reading page drives its toolbar auto-hide
+            // from that state. Reloading unconditionally used to re-parse and re-lay-out the
+            // whole article each time, which is the most expensive thing this file can do.
+            //
+            // The document is a pure function of the four values compared below, so skipping the
+            // reload when they are unchanged cannot alter what is on screen. `url` is the
+            // WebView's own current address, which is what the <base href> needs; it is read
+            // here rather than remembered because only the view knows it.
+            val previous = rendered.value
+            if (previous == null ||
+                previous.stylesheet != stylesheet ||
+                previous.script != script ||
+                previous.content != content ||
+                previous.baseUrl != it.url
+            ) {
+                rendered.value =
+                    RenderedDocument(
+                        stylesheet = stylesheet,
+                        script = script,
+                        content = content,
+                        baseUrl = it.url,
+                    )
                 settings.defaultFontSize = fontSize
                 loadDataWithBaseURL(
                     null,
-                    WebViewHtml.HTML.format(
-                        WebViewStyle.get(
-                            fontSize = fontSize,
-                            fontPath = fontPath,
-                            lineHeight = lineHeight,
-                            letterSpacing = letterSpacing,
-                            textMargin = textMargin,
-                            textColor = textColor,
-                            textBold = textBold,
-                            textAlign = textAlign,
-                            boldTextColor = boldTextColor,
-                            subheadBold = subheadBold,
-                            subheadUpperCase = subheadUpperCase,
-                            imgMargin = imgMargin,
-                            imgBorderRadius = imgBorderRadius,
-                            linkTextColor = linkTextColor,
-                            codeTextColor = codeTextColor,
-                            codeBgColor = codeBgColor,
-                            tableMargin = textMargin,
-                            selectionTextColor = selectionTextColor,
-                            selectionBgColor = selectionBgColor,
-                            paragraphIndent = paragraphIndent,
-                        ),
-                        url,
-                        content,
-                        WebViewScript.get(boldCharacters.value),
-                    ),
+                    WebViewHtml.HTML.format(stylesheet, it.url, content, script),
                     "text/HTML",
                     "UTF-8",
                     null,
                 )
             }
-        },
-    )
+        }
+    }
 }
+
+/**
+ * The inputs behind the document currently loaded in a [android.webkit.WebView].
+ *
+ * [android.webkit.WebView.loadDataWithBaseURL] takes four arguments and produces a document that
+ * depends on nothing else, so comparing these is the same test as comparing the rendered HTML -
+ * without building that HTML string on every recomposition just to throw it away.
+ */
+private class RenderedDocument(
+    val stylesheet: String,
+    val script: String,
+    val content: String,
+    val baseUrl: String?,
+)
