@@ -146,6 +146,24 @@ ReadYou 只与 Cloudflare 边缘节点建立 TLS，拿到的是**公开可信证
 都是无关变量**，会误导判断。正确判据只有一条：**用什么协议 + 证书由谁签发** ——
 `http://` 无证书不受影响；`https://` + 公共 CA 不受影响；只有 `https://` + 自签名/私有 CA 才受影响。
 
+**构建验证（2026-10-20 补做）**：这批改动最初推送时仓库的 GitHub Actions 处于禁用状态，
+`push` 成功但**没有产生任何构建**，所以当时只能给到「离线核验通过」这种弱结论。
+Actions 恢复后已手动补发，结果如下：
+
+| 项目 | 结果 |
+|---|---|
+| release | `v0.16.2-tablet.23`（prerelease），tag 指向 commit `212431e0` |
+| APK | `ReadYou-0.16.2-212431e0.apk`，10.62 MB |
+| 编译 | `fork-auto-release.yaml` 的 **Assemble 步骤通过** ← 之前缺的就是这一环 |
+| 单元测试 | `fork-unit-tests.yaml` **通过**（含字号基线守卫） |
+| 产物核对 | 远程 APK 内确认含该配置：`res/8G.xml`（AGP 混淆后的短名）内容含
+  `network-security-config` / `trust-anchors` / `certificates`(system+user) /
+  `cleartextTrafficPermitted`；manifest 的 `networkSecurityConfig` 属性在位 |
+
+> 核对方法记在 `.workbuddy/memory/MEMORY.md`「性能审计基线」一节：
+> 用 HTTP Range 只取中央目录与目标 entry，**不整包下载**；且必须**按内容找**，
+> 因为 AGP 会把 `res/xml/xxx.xml` 混淆成 `res/8G.xml` 这种短名。
+
 ### 3.0.2 `clientCertificateAlias` ≠ `trustAllCerts`（别再混为一谈）
 
 - `clientCertificateAlias` = **客户端证书**：本机**出示**证书给服务器验（双向 TLS 的客户端侧）。
