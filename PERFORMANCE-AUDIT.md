@@ -23,7 +23,7 @@
 | C2 | `-keep me.ash.reader.**` 保留全部自身类 | 中 | 中高 | 否 |
 | C3 | 缺应用自身的 baseline profile（库的已有） | **大** | 中 | 否 |
 | C4 | `enableR8.fullMode=false` | —— | —— | **建议不动** |
-| D1 | `trustAllCerts=true` 全局信任所有证书 | 安全 | —— | 否 |
+| D1 | ~~`trustAllCerts=true` 全局信任所有证书~~ **已修** | 安全 | —— | **已修 2026-10-20（摘 #1334）** |
 | D2 | `CrashHandler` 不委托默认处理器、不结束进程 | 稳定性 | —— | 否 |
 | D3 | CursorWindow 上限 100 MB | 稳定性 | —— | 否 |
 | D4 | `printStackTrace()` 被当字符串拼进日志 | —— | 无 | 否 |
@@ -303,7 +303,13 @@ full mode 假设「程序里没有反射」，而本项目用 Gson 反序列化�
 
 这一组大多不影响流畅度，但都是「某天会突然变成线上问题」的类型。
 
-### D1 — `trustAllCerts = true` 让全部 HTTPS 连接不做证书校验
+### D1 — ~~`trustAllCerts = true` 让全部 HTTPS 连接不做证书校验~~ ✅ **已修复 2026-10-20**
+
+> **状态更新（本条结论已作废）**：原判断「建议不改（用户可能正依赖它连自建服务）」，
+> 已被上游 PR **#1334** 直接推翻，本 fork 已于 2026-10-20 摘取该修复（见 `UPSTREAM-TRACKING.md` §3.0.1）。
+> **下面保留原文作为决策记录**，注意「这是上游为兼容自建 FreshRSS 的自签证书有意为之」这个前提
+> **是错的** —— 上游是代码默认值上的疏漏，被人用运行时验证工具（RVSec）检出的，
+> 并非设计取舍。将来合并上游时**不要**因为「会破坏自签证书支持」而回退这一行。
 
 `OkHttpClientModule.kt:73` 的默认参数 `trustAllCerts: Boolean = true`，配合第 132-148 行：
 
