@@ -53,4 +53,35 @@ class ForkUpdateSourceTest {
         val preview = release("0.16.3")
         assertSame(preview, newerRelease(stable, preview))
     }
+
+    // GitHub's /releases list pins the newest stable release at the head, so the newest preview
+    // is usually the *second* entry. Picking firstOrNull() would never surface it.
+    @Test
+    fun newestByVersionIgnoresThePinnedStableReleaseHead() {
+        val stable = release("v0.16.2-tablet.26")
+        val preview = release("v0.16.2-tablet.27")
+        val older = release("v0.16.2-tablet.25")
+        assertSame(preview, newestByVersion(listOf(stable, preview, older)))
+        assertSame(preview, newerRelease(stable, newestByVersion(listOf(stable, preview, older))))
+    }
+
+    @Test
+    fun newestByVersionKeepsTheEarlierEntryOnTies() {
+        val stable = release("v0.16.2-tablet.26")
+        val duplicate = release("v0.16.2-tablet.26")
+        assertSame(stable, newestByVersion(listOf(stable, duplicate)))
+    }
+
+    @Test
+    fun newestByVersionHandlesEmptyAndNull() {
+        assertNull(newestByVersion(null))
+        assertNull(newestByVersion(emptyList()))
+    }
+
+    @Test
+    fun newestByVersionComparesPlainUpstreamTags() {
+        val older = release("0.16.2")
+        val newer = release("0.16.3")
+        assertSame(newer, newestByVersion(listOf(older, newer)))
+    }
 }

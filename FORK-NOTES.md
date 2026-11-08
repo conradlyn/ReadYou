@@ -1954,12 +1954,13 @@ val values
   把 `vX.Y.Z-tablet.N` 映射成 `Version(X, Y, N)`（如 `.26` → `0.16.26`），
   不匹配 fork 形状的 tag 回退上游 `toVersion()`。新文件、纯函数、不动 `Version.kt`。
 - `ForkUpdateSource.kt`（fork 自有文件）：新增纯函数 `newerRelease(stable, newest)`；
-  `fetchForkUpdate()` **总是同时读** `/releases/latest` 与 `/releases?per_page=1`，
+  `fetchForkUpdate()` **总是同时读** `/releases/latest` 与 `/releases?per_page=20`，
   用 `toForkVersion()` 比较后取版本更高者。404 仍是「暂无正式版」的正常分支；
   403 记为 rate limit，但只要另一路有结果就照常返回，避免把主目标的失败放大。
+  **不能只取列表第一项**，原因见下方 9.19.1。
 - `AppService.kt` 最小接入：**1 行 import + 2 行注释 + 1 行调用**
   （`latest.tag_name.toVersion()` → `toForkVersion()`）。不重排缩进。
-- 守卫测试：`ForkVersionTest`（6 例）、`ForkUpdateSourceTest`（7 例）。
+- 守卫测试：`ForkVersionTest`（6 例）、`ForkUpdateSourceTest`（11 例）。
   两条分支用例刻意让「永远返回第一个」和「永远返回第二个」都会红，
   不是不可失败的测试。
 
@@ -1981,3 +1982,30 @@ tablet 序号注入 APK（`versionNameSuffix` / `buildConfigField`），而 work
       两者是 fork 新增，正常不会被上游碰到。
 - [ ] `UpdateDialog` 的下载链路若被上游恢复，注意 F-Droid 合规：仅在 github flavor 启用，
       并处理 `REQUEST_INSTALL_PACKAGES` 与 Android 8+ 未知来源授权。
+
+#### 9.19.1 实网复核：GitHub 会把最新正式版钉在 releases 列表首位
+
+`ce6f6e15` 上线后立刻用匿名 REST 复核了两个端点，发现「预览版也提示」当时**并未真正生效**：
+
+```
+GET /releases?per_page=1      -> v0.16.2-tablet.26  (prerelease=false)
+GET /releases?per_page=6      -> [.26, .27, .25, .24, .23, .22]
+GET /releases/latest         -> 200  v0.16.2-tablet.26
+GET /releases.atom           -> [.27, .26, .25, ...]   (正常时间序)
+```
+
+`.27` 的 `created_at=08:21Z` 比 `.26` 的 `07:29Z` 新、release id 也更大，但 REST 列表仍把
+最新**非 prerelease** 的 `.26` 放在第 1 位；换 `repositories/<id>/releases`、加 cache-buster
+都是同样顺序，稳定复现。因此 `firstOrNull()` 只会拿到 `.26`，刚 push 出的 `.27` 永远隐形。
+
+修法（保持上游易合并约束，只动 fork 自有文件与 1 行资源）：
+
+- `update_list_link` 由 `per_page=1` 改为 `per_page=20`；
+- `ForkUpdateSource.kt` 新增纯函数 `newestByVersion(list)`，用 `Version` 的 `compareTo`
+  运算符在整页里挑最高 tag（`Version` 未实现 `Comparable`，不能用 `maxByOrNull`），
+  并列时保留靠前条目，与 `newerRelease()` 的「并列保留正式版」一致；
+- `fetchForkUpdate()` 把 `list.body()?.firstOrNull()` 换成 `newestByVersion(list.body())`；
+- 新增 4 例单测，其中一例直接构造 `[.26, .27, .25]` 钉住这个顺序陷阱。
+
+复核要点：以后若 GitHub 改回严格时间序，这个扫描仍然正确；若分页首页没有覆盖到更新的
+预览版（>20 个 release 且乱序极端情况），需要再加大 `per_page` 或改读 atom feed。

@@ -10,6 +10,10 @@ import me.ash.reader.infrastructure.net.NetworkDataSource
  * answers 404 while the repo has no stable release at all). Both requests are therefore made and
  * the newer tag wins, using [toForkVersion] so `v0.16.2-tablet.N` tags compare correctly.
  *
+ * The releases list is not reliably chronological: GitHub pins the newest *stable* release at the
+ * head even when a newer pre-release exists. Never take its first entry; scan the whole page and
+ * pick the highest tag instead.
+ *
  * Kept out of [AppService] so that an upstream change to `checkUpdate()` stays easy to merge:
  * the caller only swaps one call in place of the old `getReleaseLatest` line.
  */
@@ -27,6 +31,21 @@ internal fun newerRelease(stable: LatestRelease?, newest: LatestRelease?): Lates
         else -> stable
     }
 
+/**
+ * Highest tag in a releases page. Uses the Version operator directly rather than maxByOrNull,
+ * because [me.ash.reader.domain.model.general.Version] defines `compareTo` but does not implement
+ * `Comparable`. Ties keep the earlier entry, so a stable release wins over an equally tagged
+ * preview, matching [newerRelease].
+ */
+internal fun newestByVersion(releases: List<LatestRelease>?): LatestRelease? =
+    releases.orEmpty().fold(null as LatestRelease?) { best, candidate ->
+        when {
+            best == null -> candidate
+            candidate.tag_name.toForkVersion() > best.tag_name.toForkVersion() -> candidate
+            else -> best
+        }
+    }
+
 internal suspend fun fetchForkUpdate(
     dataSource: NetworkDataSource,
     latestUrl: String,
@@ -41,10 +60,11 @@ internal suspend fun fetchForkUpdate(
 
     // The list includes pre-releases, so read it even when /releases/latest succeeded. Otherwise
     // the first stable release would pin "latest" forever and later preview builds stay invisible.
+    // Its first entry is that pinned stable release, hence the version scan over the whole page.
     val list = dataSource.getReleases(listUrl)
     val listLimited = list.code() == 403
     val stable = latest.body()
-    val newest = if (listLimited) null else list.body()?.firstOrNull()
+    val newest = if (listLimited) null else newestByVersion(list.body())
     val chosen = newerRelease(stable, newest)
     return when {
         chosen != null -> ForkUpdateLookup(release = chosen)

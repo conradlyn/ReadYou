@@ -163,8 +163,10 @@
     <!-- This fork has no wiki, so Help opens the repository README instead. -->
     <string name="wiki_link" translatable="false">https://github.com/conradlyn/ReadYou/blob/main/README.md</string>
     <string name="update_link">https://api.github.com/repos/conradlyn/ReadYou/releases/latest</string>
-    <!-- GitHub 404s /releases/latest while a repo has only pre-releases; used as fallback. -->
-    <string name="update_list_link" translatable="false">https://api.github.com/repos/conradlyn/ReadYou/releases?per_page=1</string>
+    <!-- Read alongside update_link: the list includes pre-releases, which /releases/latest hides.
+         GitHub pins the newest stable release at the head of this list, so a page is fetched and
+         the highest tag wins instead of trusting the first entry. -->
+    <string name="update_list_link" translatable="false">https://api.github.com/repos/conradlyn/ReadYou/releases?per_page=20</string>
     <string name="upstream_project_link" translatable="false">https://github.com/ReadYouApp/ReadYou</string>
     <string name="upstream_attribution" translatable="false">Based on the open-source Read You project</string>
     <string name="change_log">Changelog</string>
