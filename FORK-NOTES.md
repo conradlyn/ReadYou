@@ -2065,20 +2065,52 @@ GET /releases.atom           -> [.27, .26, .25, ...]   (正常时间序)
 已注释掉的 `UpdateViewAction.DownloadUpdate` 不能照抄恢复：那个类在仓库里已不存在，
 正确来源是 `LocalNewVersionDownloadUrl`；`downloadUpdate()` 是现成方法。
 
-**用户侧流程**：冷启动静默检查 → 有真更新时订阅源页/设置页出现横幅 → 点横幅看更新日志 →
-点「更新」自动下载并弹出系统安装器。不再需要去 GitHub 手动下载，也不再重复提示同一版。
-**刻意保留一次点击**：不在后台静默下载几十 MB，也不静默安装（Android 本来就必须让用户确认）。
+**用户侧流程（从 `.29`+ 起成立）**：冷启动静默检查 → 有真更新时订阅源页/设置页出现横幅 →
+点横幅看更新日志 → 点「更新」自动下载并弹出系统安装器。不再需要去 GitHub 手动下载，
+也不再重复提示同一版。**刻意保留一次点击**：不在后台静默下载几十 MB，也不静默安装
+（Android 本来就必须让用户确认）。
 
-#### 9.20.4 迁移与上游同步注意
+**这条流程不能反向修好旧 APK**：改动只在新构建里，已经烧进用户设备的 `.26` 用的是旧
+解析器，服务端改 release / 再发一个正式版都无法让它自动发现新版本。见 9.20.4 的
+「一次性迁移断层」。
 
-- 已装的 `.26` / `.28` 是本改动**之前**构建的，`TABLET_BUILD = 0`。它们会把 `.29` 当作
-  新版本提示（本来也确实该升级）；**装过一次 `.29`+ 之后才具备精确比较能力**。
+#### 9.20.4 迁移与上游同步注意（含一次性断层）
+
+旧 APK 里的更新逻辑是**编译进去的**，服务端发多少 release 都改不了它。逐版本实测结论
+（用 `git show <tag>:...` 核对过各自源码，不是推演）：
+
+| 已装版本 | commit | 能否发现 `.29` | 能否应用内下载安装 | 原因 |
+| --- | --- | --- | --- | --- |
+| `.26` 正式版 | `60609e85` | **完全不能** | 否 | 那时还没有 `ForkVersion.kt` / `TABLET_BUILD`；`tag_name.toVersion()` 把 `v0.16.2-tablet.N` 读成 `(0,16,0)`，永远小于 `versionName 0.16.2` → `(0,16,2)`；且 `fetchForkUpdate` 在 `/releases/latest` 返回 200 时**直接 return，不读 releases 列表**，而该端点返回的正是 `.26` 自己 |
+| `.27` / `.28` | `ce6f6e15` / `a4c4267c` | 能 | 否 | 已有 `toForkVersion()` 且总会读列表，所以看得见 `.29`；但 `UpdateDialog` 确认按钮仍然只打开 `/releases` 网页 |
+| `.29`+ | `c6a1d2c0`+ | 能 | 能 | 完整链路 + `BuildConfig.TABLET_BUILD` 精确比较 |
+
+所以：**用户当前手上的 `.26` 必须手动去 GitHub 装一次 `.29`（或更新的包），
+这是唯一一次；之后才是全自动。** 之后即使再手动发一个正式版 `.30` 也救不了 `.26`——
+旧解析器仍把 `v0.16.2-tablet.30` 读成 `0.16.0`。发正式版的价值只是让
+`/releases/latest` 指向带新代码的构建，避免「latest 是旧代码」的混淆，不是修好旧设备。
+
+注意 `TABLET_BUILD = 0` 这个说法**只适用于本地 / Build Commit / Unit Tests 的非 release
+构建**（`c6a1d2c0` 之后才有这个字段）；`.26` 连字段都不存在，不能一概而论。
+
 - `skipVersion` / `newVersionNumber` 里存的是映射后的三字段字符串（如 `0.16.20029`）。
   旧值 `0.16.28` 与新坐标系不冲突（远小于 `0.16.20029`），不会误屏蔽新版本。
 - 上游同步后核验：`app/build.gradle.kts` 的 `buildConfigField` 与 `-PtabletBuild` 接线、
   `fork-auto-release.yaml` 的「先 reserve 再 assemble」顺序（**这两处是 fork 自有改动，
   上游改 workflow / build.gradle 时最容易被覆盖**）、`UpdateDialog` 是否又被改回只开浏览器、
   `app/src/github/AndroidManifest.xml` 是否被误并进 main。
-- 正式版仍靠手动 `Run workflow` 取消勾选 `prerelease` 发布；push 到 `main` 的含代码改动
-  一律出 pre-release。`/releases/latest` 只返回正式版 `.26`，应用内靠 9.19.1 的
-  `per_page=20` 扫描看到后续预览版。
+- **发布触发**：`push` 到 `main` 且含非 `.md` 改动 → 自动 pre-release；手动
+  `Run workflow` 保持勾选 `prerelease` → 也是 pre-release；手动**取消勾选** → 正式版。
+  纯 `.md` 提交会跳过 `Fork Auto Release`，但 `Build Commit` / `Unit Tests` 照跑。
+  不要在本地手动 push `v*` tag，会误触发上游 `release-build.yaml`。
+  `/releases/latest` 只返回正式版（目前 `.26`；若日后手动发布新正式版，本节里的 `.26`
+  相应换成新 tag），应用内靠 9.19.1 的 `per_page=20` 整页扫描看到后续预览版。
+- **真机验证清单（`.29` 起）**：
+  1. 手动覆盖安装 `v0.16.2-tablet.29` 的 `ReadYou-0.16.2-c6a1d2c0.apk`（同一 debug 签名，
+     可直接覆盖 `.26`；若装的是 F-Droid / Google Play 包则必须先卸载）。
+  2. 「关于与支持」页版本号应显示 `0.16.2-tablet.29`，证明 `TABLET_BUILD` 已注入。
+  3. 冷启动一次：若 `.29` 仍是最高版本，应**不出现**更新横幅（精确比较生效，不再重复点掉）。
+  4. 下一次含代码 push 产出 `.30` 后冷启动：应出现横幅 → 点开看日志 → 点「更新」出现下载
+     百分比 → 自动拉起系统安装器。首次可能要先允许「安装未知应用」。
+  5. 若只想立刻验证下载链路，可在「关于与支持」页点 Logo 手动检查；前提是远端已有比
+     已装版本更高的 release。
