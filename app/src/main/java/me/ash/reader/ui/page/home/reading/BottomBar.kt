@@ -27,6 +27,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
@@ -46,7 +47,7 @@ private val sizeSpec = spring<IntSize>(stiffness = 700f)
 
 @Composable
 fun BottomBar(
-    isShow: Boolean,
+    isShow: State<Boolean>,
     isUnread: Boolean,
     isStarred: Boolean,
     isNextArticleAvailable: Boolean,
@@ -71,7 +72,7 @@ fun BottomBar(
         contentAlignment = Alignment.BottomCenter
     ) {
         AnimatedVisibility(
-            visible = isShow,
+            visible = isShow.value,
             enter = expandVertically(expandFrom = Alignment.Top, animationSpec = sizeSpec),
             exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = sizeSpec)
         ) {

@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
-import kotlin.math.abs
 import kotlinx.coroutines.launch
 import me.ash.reader.R
 import me.ash.reader.infrastructure.android.TextToSpeechManager
@@ -76,17 +75,19 @@ fun ReadingPage(
     val boldCharacters = LocalReadingBoldCharacters.current
     val coroutineScope = rememberCoroutineScope()
 
-    var isReaderScrollingDown by remember { mutableStateOf(false) }
+    val scrollDirection = rememberReaderScrollDirection()
     var showFullScreenImageViewer by remember { mutableStateOf(false) }
 
     var currentImageData by remember { mutableStateOf(ImageData()) }
 
+    // A State, not a Boolean: only the two toolbars read its value, so a change of scroll
+    // direction never recomposes ReadingPage or the article subtree below it.
     val isShowToolBar =
-        if (LocalReadingAutoHideToolbar.current.value) {
-            readerState.articleId != null && !isReaderScrollingDown
-        } else {
-            true
-        }
+        rememberReaderToolbarVisible(
+            autoHideToolbar = LocalReadingAutoHideToolbar.current.value,
+            hasArticle = readerState.articleId != null,
+            scrollDirection = scrollDirection,
+        )
 
     var showTopDivider by remember { mutableStateOf(false) }
 
@@ -247,8 +248,7 @@ fun ReadingPage(
                                                 Modifier.pullToLoad(
                                                     state = state,
                                                     onScroll = { f ->
-                                                        if (abs(f) > 2f)
-                                                            isReaderScrollingDown = f < 0f
+                                                        scrollDirection.onScroll(f)
                                                     },
                                                     enabled = isPullToSwitchArticleEnabled,
                                                 ),

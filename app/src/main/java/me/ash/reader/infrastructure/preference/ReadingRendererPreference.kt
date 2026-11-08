@@ -34,7 +34,9 @@ sealed class ReadingRendererPreference(val value: Int) : Preference() {
 
     companion object {
 
-        val default = WebView
+        // The native LazyColumn path is measurably smoother on the target tablet.
+        // An explicit DataStore choice still wins; this only changes the fallback.
+        val default = NativeComponent
         val values = listOf(WebView, NativeComponent)
 
         fun fromPreferences(preferences: Preferences) =

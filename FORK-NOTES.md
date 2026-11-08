@@ -1677,3 +1677,170 @@ private val TopAppBarTitleInset = 16.dp - TopAppBarHorizontalPadding      // = 1
 - [ ] **material3 的 `TopAppBarTitleInset` / `TopAppBarHorizontalPadding` 是否仍是 12dp / 4dp。**
       判据：下载 `material3-android-<版本>-sources.jar`，在 `AppBar.kt` 里搜这两个名字。
       改了就把 `FlowTitleOriginInLargeTopAppBar` 改成 `TitleInset + HorizontalPadding`。
+
+---
+
+## §9.16 滑动流畅度：第二轮（默认原生渲染器 + 四处低风险重组/复用优化）
+
+### 前提：不要重复已经做过的事
+
+远端 `main` 已合入 `READING-SCROLL-PERF.md` 的 A1/A2/A3 修复（`RYWebView` 不再每次重组重载整篇
+HTML、不再把正文写进 logcat、`onRelease` 里 `destroy()`），并且用户已在 8.8 英寸平板上
+用 `v0.16.2-tablet.22 / .23` 真机确认 WebView 链路流畅。**本轮不重做 A 组**，
+也不碰 B1（把滚动交回 WebView 内部，报告里实测后明确不建议做）。
+
+本轮只做用户勾选的 5 项，全部保持视觉效果不变（第 1 项除外，它是产品决策）。
+
+### 1. 默认渲染器切 `NativeComponent`
+
+`ReadingRendererPreference.default`：`WebView` → `NativeComponent`。
+
+- **只改 fallback**。`fromPreferences()` 仍按 DataStore 里显式存的值（0/1）解析，
+  老用户手动选过 WebView 的不会被偷偷改掉；设置页 `values` 仍提供两项，随时可切回。
+- 依据：报告里真机对比「原生组件比 WebView 流畅得多」（原生链路是真正虚拟化的 `LazyColumn`，
+  WebView 链路是 `verticalScroll` 包住撑满整篇高度的 WebView）。
+- 守卫测试 `ReadingRendererPreferenceTest.kt`：3 个用例钉住 `default`、0/1 存储值、
+  两项仍在设置里提供。**防止上游同步时把默认值悄悄改回 WebView。**
+
+### 2. 滚动方向状态下沉（消除整页重组）
+
+上游在 `ReadingPage` 顶层读 `var isReaderScrollingDown by remember { mutableStateOf(false) }`，
+所以每次上下滑动翻转方向，`ReadingPage` 整个重组 —— 连带 `AnimatedContent`、`Content`、
+把文章解析成 item 的 `Reader` 全部重跑。
+
+新文件 `ReaderScrollDirection.kt`：
+
+| 成员 | 作用 |
+|---|---|
+| `ReaderScrollDirection`（`@Stable`） | 包住 `MutableState<Boolean>`，`onScroll(delta)` 写入 |
+| `readerScrollDirectionOrNull(delta)` | **纯函数**，`abs(delta) > 2f` 阈值原样搬过来，供 JVM 单测 |
+| `rememberReaderScrollDirection()` | 返回稳定 holder |
+| `rememberReaderToolbarVisible(...)` | 返回 `State<Boolean>`（`derivedStateOf`） |
+
+`TopBar` / `BottomBar` 的 `isShow` 由 `Boolean` 改成 `State<Boolean>`，在各自的
+`AnimatedVisibility(visible = isShow.value)` 里才读值。`ReadingPage` 自身只读那个稳定的
+`State` 对象并往下传，不读 `.value` —— 重组作用域因此收进两条工具栏。
+全仓 `TopBar(` / `BottomBar(` 只有阅读页这两处调用，改签名不会波及其它页面。
+
+语义逐字节不变：`abs(f) > 2f` 才翻转、`f < 0f` 为向下滑；`ReaderScrollDirectionTest.kt`
+专门钉住 `2.0f → null`、`±2.01f → 翻转`。
+
+### 3. 阅读页原生链路补 `contentType`
+
+新文件 `ReaderContentType.kt` 集中 7 个常量，`ReaderContentTypeTest.kt` 钉住集合非空、唯一、完整。
+
+- `Content.kt`：headline / footer 两个 `item`；
+- `HtmlToComposable.kt`：paragraph / code block / image / caption / video 五处 `item`。
+
+只加 `contentType =`，**没动解析算法、没动 item 顺序、没加 key**（原生链路的 item 来自
+HTML 解析且可能重复，贸然按内容生成 key 风险大于收益）。`@Preview testIt()` 里的示例
+`LazyColumn` 不改 —— 那不是正式渲染路径。
+
+### 4. 三页共用的滚动条淡出改 debounce
+
+`VerticalScrollIndicator.onAttach()` 原来用 `collectLatest { alpha.snapTo(1f); delay(3000); ... }`：
+`snapshotFlow` 每帧发射一次，`collectLatest` 就取消并重开一次协程，等于每秒最多 60 次
+取消 + 重建 `delay(3000)`。改成 `onEach { alpha.snapTo(1f) } → debounce(3000) → collect { animateTo(0f) }`。
+
+视觉规则不变（**最后一次滚动后再过 3 秒淡出**），但收集器只在静止满 3 秒时跑一次。
+FlowPage / FeedsPage / ReadingPage 三页共用同一个 factory，一处改动全覆盖。
+
+### 5. 订阅源页补稳定 group key
+
+新文件 `FeedsGroupKey.kt`：`feedsGroupKey(groupId) = "feeds-group:$groupId"`，
+前缀刻意避开列表里其它 `item {}` 行的默认命名空间。
+`FeedsPage` 的 `itemsIndexed` 原来用位置当 key，插入/重排一个分组会让下面所有 key 位移、
+整段 remembered state 作废；现在用 Room 主键。`FeedsGroupKeyTest.kt` 4 个用例钉住稳定性。
+
+### 离线核验（本机无 JDK，编译只能由 CI 证实）
+
+- 21 个 Kotlin 文件 `balance` 全过；`check_trailing_lambda.py app/src` **0 条**；
+- `assert --contains` 按文件分别跑 18 组全过；`imports --watch` **按文件分 2 组**全过；
+- 反向断言：`ReadingPage` 再无 `isReaderScrollingDown` / `import kotlin.math.abs`，
+  `VerticalScrollIndicator` 再无 `collectLatest` / `delay(3000)`；
+- 42 个 `values*/strings.xml` 资源 XML 全部 well-formed、无重复 name。
+- **审读 diff 抓到一个真编译错误**：`checkUpdate()` 的正则锚点把
+  `skipVersion` / `currentVersion` 两行一并吃掉，而 `whetherNeedUpdate(...)` 仍在引用它们 ——
+  已补回。这类「替换范围比预期大」的问题静态断言抓不到，必须逐段读 `git diff`。
+
+### 上游同步后要核验的
+
+- [ ] `ReadingRendererPreference.default` 是否仍是 `NativeComponent`（守卫测试会红）。
+- [ ] `TopBar` / `BottomBar` 是否仍收 `State<Boolean>`；若上游改了签名，
+      阅读页两处调用要一起改，别让 `.value` 回到 `ReadingPage` 顶层。
+- [ ] `HtmlToComposable.kt` 是否冒出**新的** `item {}`（新的内容类型要补一个 contentType）。
+- [ ] `VerticalScrollIndicator` 是否回到 `collectLatest`。
+- [ ] `FeedsPage` 的 `itemsIndexed` 是否还带 `key =`。
+- [ ] 若上游给原生链路加了 `key`，注意别和本 fork 的 `contentType` 命名冲突。
+
+---
+
+## §9.17 应用内链接指向本 fork，但保留上游出处
+
+### 原则
+
+**应用功能链接指向 fork，出处/版权/内容引用保留上游。** 用户明确要求
+「把软件内的链接等都指向本项目的 github 仓库」+「但要保留一个指向上游的提示，或者文字」。
+
+### 改成 fork 的（应用内可点的功能链接）
+
+| 资源 / 位置 | 旧 | 新 | 消费点 |
+|---|---|---|---|
+| `github_link` | `ReadYouApp/ReadYou` | `conradlyn/ReadYou` | 关于页 GitHub 按钮、`LicenseListPage` 的 LICENSE、`UpdateDialog` |
+| `wiki_link` | 上游 wiki Getting-Started | fork `README.md` | 关于页 Help 按钮 |
+| `issue_tracer_url` | 上游 issues | fork issues | 故障排查页、崩溃报告 |
+| `update_link` | 上游 `/releases/latest` | fork `/releases/latest` | `AppService.checkUpdate()`（**42 个 locale 全改**） |
+| `AccountService` | `ReadYouApp.png` + 上游 `releases.atom` | `conradlyn.png` + fork `releases.atom` | 首次启动自动订阅的「ReadYou Releases」源 |
+| `UpdateDialog` | `${github_link}/releases/latest` | `${github_link}/releases` | 更新弹窗下载按钮 |
+
+fork 没有 wiki（`/wiki/Getting-Started` 实测重定向到仓库首页），所以 Help 改指 README。
+`/releases/latest` **网页**也会重定向到 releases 列表，弹窗直接写 `/releases` 语义更稳。
+
+### 刻意保留上游的
+
+- `tos_content` 里的 `- [1] https://github.com/ReadYouApp/ReadYou` —— 默认及约 38 个
+  locale 的 Open source license 附录，**原样不动**，本身就是用户要的「指向上游的文字」。
+- `telegram_link` 保留 `https://t.me/ReadYouApp` —— 上游社区频道，fork 没有对应群组。
+- `upstream_project_link` + `upstream_attribution`：关于页版本号下方新增一行可点击文字
+  「Based on the open-source Read You project」，点击打开上游仓库。
+  放在**带 `detectTapGestures` 的 Logo `Column` 之外**（否则会和「点 Logo 检查更新」
+  的彩蛋抢手势），但仍在同一个 `LazyColumn` item 内。
+- `translatable_url`（Weblate `hosted.weblate.org/projects/readyou/`）不是 GitHub 仓库，
+  且 fork 没有对应翻译项目，保留。
+- `reeder.html` 里的两处上游链接是介绍文章中的版本/技术出处引用；
+  `MainActivity.kt:72` 的 `/issues/312` 是代码注释里的问题编号；**都是内容，不是功能链接，不动**。
+- 第三方许可证、GPL、Feeder、MusicYou、FreshRSS 等版权与技术出处一律不动。
+
+### 必须配套的坑：fork `/releases/latest` 返回 404
+
+GitHub 的 `/releases/latest` **只返回非 prerelease 的最新 release**。本 fork 至今全部是
+pre-release，所以：
+
+```
+GET api.github.com/repos/conradlyn/ReadYou/releases/latest        → 404 Not Found
+GET api.github.com/repos/conradlyn/ReadYou/releases?per_page=1    → 200, tag v0.16.2-tablet.23,
+                                                                    prerelease=true, assets=1
+```
+
+**直接把 `update_link` 换过去会让「检查更新」变成报错。** 因此新增：
+
+- `update_list_link`（`translatable="false"`）：releases 列表 URL；
+- `NetworkDataSource.getReleases(@Url): Response<List<LatestRelease>>`；
+- 新文件 `ForkUpdateSource.kt` 的 `fetchForkUpdate()`：先请求 `/releases/latest`，
+  403 → `rateLimited`，有 body → 直接用；**仅 404** 才回退到列表取第一项；
+  其它状态码按真失败处理。将来发布正式版后主请求自然重新生效，不需要再改代码。
+- `AppService.checkUpdate()` 只把原来一次 `getReleaseLatest` 换成一次 `fetchForkUpdate`，
+  其余（跳过版本、版本比较、toast、下载）保持原样。
+
+新逻辑全部放新文件，既有文件只加最小调用点 —— 上游若改 `checkUpdate()`，
+合并时只需把这一行重新接上，不用重做整个函数。
+
+### 上游同步后要核验的
+
+- [ ] 42 个 locale 的 `update_link` 有没有被上游覆盖回 `ReadYouApp`；
+      `github_link` / `wiki_link` / `issue_tracer_url` 只在默认 `values/strings.xml` 定义，别被同步覆盖。
+- [ ] `tos_content` 里的上游地址是否还在（这是用户明确要求保留的出处）。
+- [ ] `AppService.checkUpdate()` 是否还走 `fetchForkUpdate`；若上游重写了该函数，
+      把 `ForkUpdateSource.kt` 的调用重新接入即可。
+- [ ] **若将来发布了正式版**，`/releases/latest` 会开始返回 200；那时兜底分支自然休眠，
+      不要因为「用不上了」就删掉 —— 一旦又只发 pre-release 就会重新 404。

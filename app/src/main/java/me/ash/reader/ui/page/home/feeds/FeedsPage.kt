@@ -310,7 +310,10 @@ fun FeedsPage(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    itemsIndexed(groupWithFeedList) { _, (group, feeds) ->
+                    itemsIndexed(
+                        groupWithFeedList,
+                        key = { _, groupWithFeed -> feedsGroupKey(groupWithFeed.group.id) },
+                    ) { _, (group, feeds) ->
                         GroupWithFeedsContainer {
                             GroupItem(
                                 isExpanded = {

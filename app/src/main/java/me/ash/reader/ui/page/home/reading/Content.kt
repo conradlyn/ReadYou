@@ -29,6 +29,7 @@ import me.ash.reader.infrastructure.preference.LocalReadingRenderer
 import me.ash.reader.infrastructure.preference.LocalReadingSubheadUpperCase
 import me.ash.reader.infrastructure.preference.ReadingRendererPreference
 import me.ash.reader.ui.component.reader.LocalTextContentWidth
+import me.ash.reader.ui.component.reader.ReaderContentType
 import me.ash.reader.ui.component.reader.Reader
 import me.ash.reader.ui.component.reader.isChineseDominant
 import me.ash.reader.ui.component.reader.paragraphIndentCss
@@ -130,7 +131,7 @@ fun Content(
                         state = listState,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        item {
+                        item(contentType = ReaderContentType.Headline) {
                             // Top bar height
                             Spacer(modifier = Modifier.height(64.dp))
                             // padding
@@ -148,7 +149,7 @@ fun Content(
                             paragraphIndent = paragraphIndentText(paragraphIndentEnabled, isChinese),
                         )
 
-                        item {
+                        item(contentType = ReaderContentType.Footer) {
                             Spacer(modifier = Modifier.height(128.dp))
                             Spacer(
                                 modifier = Modifier.height(contentPadding.calculateBottomPadding())

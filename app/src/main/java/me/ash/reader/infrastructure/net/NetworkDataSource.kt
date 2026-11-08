@@ -20,6 +20,9 @@ interface NetworkDataSource {
     suspend fun getReleaseLatest(@Url url: String): Response<LatestRelease>
 
     @GET
+    suspend fun getReleases(@Url url: String): Response<List<LatestRelease>>
+
+    @GET
     @Streaming
     suspend fun downloadFile(@Url url: String): ResponseBody
 

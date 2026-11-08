@@ -109,8 +109,8 @@ constructor(
         Feed(
             id = account.id!!.spacerDollar(UUID.randomUUID().toString()),
             name = "ReadYou Releases",
-            icon = "https://github.com/ReadYouApp.png",
-            url = "https://github.com/ReadYouApp/ReadYou/releases.atom",
+            icon = "https://github.com/conradlyn.png",
+            url = "https://github.com/conradlyn/ReadYou/releases.atom",
             groupId = group.id,
             accountId = account.id,
         )

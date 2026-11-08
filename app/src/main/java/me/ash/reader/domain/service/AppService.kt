@@ -34,25 +34,29 @@ class AppService @Inject constructor(
 
     suspend fun checkUpdate(showToast: Boolean = true): Boolean? = withContext(ioDispatcher) {
         try {
-            val response = networkDataSource.getReleaseLatest(context.getString(R.string.update_link))
-            when {
-                response.code() == 403 -> {
-                    withContext(mainDispatcher) {
-                        if (showToast) context.showToast(context.getString(R.string.rate_limit))
-                    }
-                    return@withContext null
+            // This fork publishes pre-releases, which GitHub hides from /releases/latest.
+            // The lookup falls back to the newest entry of the releases list on a 404.
+            val lookup =
+                fetchForkUpdate(
+                    networkDataSource,
+                    context.getString(R.string.update_link),
+                    context.getString(R.string.update_list_link),
+                )
+            if (lookup.rateLimited) {
+                withContext(mainDispatcher) {
+                    if (showToast) context.showToast(context.getString(R.string.rate_limit))
                 }
-
-                response.body() == null -> {
-                    withContext(mainDispatcher) {
-                        if (showToast) context.showToast(context.getString(R.string.check_failure))
-                    }
-                    return@withContext null
+                return@withContext null
+            }
+            val latest = lookup.release
+            if (latest == null) {
+                withContext(mainDispatcher) {
+                    if (showToast) context.showToast(context.getString(R.string.check_failure))
                 }
+                return@withContext null
             }
             val skipVersion = context.skipVersionNumber.toVersion()
             val currentVersion = context.getCurrentVersion()
-            val latest = response.body()!!
             val latestVersion = latest.tag_name.toVersion()
 //            val latestVersion = "1.0.0".toVersion()
             val latestLog = latest.body ?: ""

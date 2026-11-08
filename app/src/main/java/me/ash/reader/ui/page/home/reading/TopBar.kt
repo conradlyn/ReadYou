@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -54,7 +55,7 @@ private val sizeSpec = spring<IntSize>(stiffness = 700f)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopBar(
-    isShow: Boolean,
+    isShow: State<Boolean>,
     isScrolled: Boolean = false,
     title: String? = "",
     link: String? = "",
@@ -85,7 +86,7 @@ fun TopBar(
                         .height(WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
             )
             AnimatedVisibility(
-                visible = isShow,
+                visible = isShow.value,
                 enter = expandVertically(expandFrom = Alignment.Bottom, animationSpec = sizeSpec),
                 exit = shrinkVertically(shrinkTowards = Alignment.Bottom, animationSpec = sizeSpec),
             ) {

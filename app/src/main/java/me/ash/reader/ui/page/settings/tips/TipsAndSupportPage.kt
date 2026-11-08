@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -238,6 +239,21 @@ fun TipsAndSupportPage(
                             )
                         }
                     }
+                    // Deliberately outside the logo Column: that Column owns a
+                    // detectTapGestures for the check-for-updates easter egg. The links above
+                    // point at this fork; keep one visible credit to the upstream project.
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.upstream_attribution),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.clickable {
+                            context.openURL(
+                                context.getString(R.string.upstream_project_link),
+                                OpenLinkPreference.AutoPreferCustomTabs,
+                            )
+                        },
+                    )
                 }
                 item {
                     Spacer(modifier = Modifier.height(48.dp))

@@ -95,7 +95,7 @@ private fun LazyListScope.formatBody(
     val composer = TextComposer(
         paragraphIndent = paragraphIndent,
     ) { paragraphBuilder ->
-        item {
+        item(contentType = ReaderContentType.Paragraph) {
             val textLinkStyles = textLinkStyles()
             val paragraph =
                 paragraphBuilder.toAnnotatedString().mapAnnotations {
@@ -147,7 +147,7 @@ private fun LazyListScope.formatCodeBlock(
     baseUrl: String,
 ) {
     val composer = TextComposer { paragraphBuilder ->
-        item {
+        item(contentType = ReaderContentType.CodeBlock) {
             val contentWidth = LocalTextContentWidth.current
             val scrollState = rememberScrollState()
             Spacer(modifier = Modifier.height(8.dp))
@@ -507,7 +507,7 @@ private fun TextComposer.appendTextChildren(
                         if (imageCandidates.hasImage) {
                             val alt = element.attr("alt") ?: ""
                             appendImage(onLinkClick = onLinkClick) { onClick ->
-                                lazyListScope.item {
+                                lazyListScope.item(contentType = ReaderContentType.Image) {
                                     val contentWidth = LocalImageContentWidth.current
                                     Column(
                                         modifier =
@@ -536,7 +536,7 @@ private fun TextComposer.appendTextChildren(
 
                     "figcaption",
                     "caption" -> {
-                        lazyListScope.item {
+                        lazyListScope.item(contentType = ReaderContentType.Caption) {
                             val contentWidth = LocalTextContentWidth.current
                             Text(
                                 modifier =
@@ -645,7 +645,7 @@ private fun TextComposer.appendTextChildren(
 
                         if (video != null) {
                             appendImage(onLinkClick = onLinkClick) {
-                                lazyListScope.item {
+                                lazyListScope.item(contentType = ReaderContentType.Video) {
                                     val contentWidth = LocalImageContentWidth.current
                                     Column(
                                         modifier =

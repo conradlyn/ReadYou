@@ -20,12 +20,14 @@ import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 private val ThumbColor
     @Composable get() = MaterialTheme.colorScheme.outline.copy(alpha = .5f)
+
+private const val ScrollIndicatorFadeDelayMs = 3000L
 
 @Composable
 fun Modifier.drawVerticalScrollIndicator(scrollState: ScrollState): Modifier {
@@ -60,13 +62,15 @@ data class VerticalScrollIndicatorFactory(
             private val alpha = Animatable(0f)
 
             override fun onAttach() {
+                // The old per-frame collector cancelled and relaunched a 3-second timer on
+                // every scroll frame - up to 60 times a second. Debouncing keeps the same
+                // visual rule (fade out 3s after the last scroll) but the collector only runs
+                // once the list has been idle that long. Shared by all three list pages.
                 coroutineScope.launch {
                     snapshotFlow { state.scrollOffset }
-                        .collectLatest {
-                            alpha.snapTo(1f)
-                            delay(3000)
-                            alpha.animateTo(0f, animationSpec = spring())
-                        }
+                        .onEach { alpha.snapTo(1f) }
+                        .debounce(ScrollIndicatorFadeDelayMs)
+                        .collect { alpha.animateTo(0f, animationSpec = spring()) }
                 }
             }
 
