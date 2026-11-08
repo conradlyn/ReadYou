@@ -1,14 +1,14 @@
 package me.ash.reader.domain.service
 
+import me.ash.reader.domain.model.general.toForkVersion
 import me.ash.reader.infrastructure.net.LatestRelease
 import me.ash.reader.infrastructure.net.NetworkDataSource
 
 /**
- * GitHub's `/releases/latest` skips drafts and pre-releases. This fork has published only
- * pre-releases so far, so that endpoint answers 404 even though the release feed is full, which
- * would make "check for updates" look broken. When it does, fall back to the newest entry of the
- * releases list (which does include pre-releases). A stable release, once published, still wins
- * on the primary request.
+ * GitHub's `/releases/latest` skips drafts and pre-releases. This fork publishes a pre-release on
+ * every push, so that endpoint alone would never surface them once a stable release exists (and it
+ * answers 404 while the repo has no stable release at all). Both requests are therefore made and
+ * the newer tag wins, using [toForkVersion] so `v0.16.2-tablet.N` tags compare correctly.
  *
  * Kept out of [AppService] so that an upstream change to `checkUpdate()` stays easy to merge:
  * the caller only swaps one call in place of the old `getReleaseLatest` line.
@@ -18,18 +18,36 @@ internal class ForkUpdateLookup(
     val rateLimited: Boolean = false,
 )
 
+/** Pure selection, so the "newer preview wins" rule can be unit tested without Retrofit. */
+internal fun newerRelease(stable: LatestRelease?, newest: LatestRelease?): LatestRelease? =
+    when {
+        stable == null -> newest
+        newest == null -> stable
+        newest.tag_name.toForkVersion() > stable.tag_name.toForkVersion() -> newest
+        else -> stable
+    }
+
 internal suspend fun fetchForkUpdate(
     dataSource: NetworkDataSource,
     latestUrl: String,
     listUrl: String,
 ): ForkUpdateLookup {
     val latest = dataSource.getReleaseLatest(latestUrl)
-    if (latest.code() == 403) return ForkUpdateLookup(release = null, rateLimited = true)
-    latest.body()?.let { return ForkUpdateLookup(release = it) }
-    // 404 here means "no stable release yet". Any other status is a real failure.
-    if (latest.code() != 404) return ForkUpdateLookup(release = null)
+    val latestLimited = latest.code() == 403
+    // 404 is expected while the repo has no stable release; anything else is a real failure.
+    if (!latestLimited && latest.code() != 404 && latest.code() != 200) {
+        return ForkUpdateLookup(release = null)
+    }
 
+    // The list includes pre-releases, so read it even when /releases/latest succeeded. Otherwise
+    // the first stable release would pin "latest" forever and later preview builds stay invisible.
     val list = dataSource.getReleases(listUrl)
-    if (list.code() == 403) return ForkUpdateLookup(release = null, rateLimited = true)
-    return ForkUpdateLookup(release = list.body()?.firstOrNull())
+    val listLimited = list.code() == 403
+    val stable = latest.body()
+    val newest = if (listLimited) null else list.body()?.firstOrNull()
+    val chosen = newerRelease(stable, newest)
+    return when {
+        chosen != null -> ForkUpdateLookup(release = chosen)
+        else -> ForkUpdateLookup(release = null, rateLimited = latestLimited || listLimited)
+    }
 }

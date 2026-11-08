@@ -1922,3 +1922,62 @@ val values
 - [ ] `fork-unit-tests.yaml` 的 `Annotate failing tests` 步骤是否被覆盖；它是 fork 自有文件，
       正常不会被上游碰到。
 - [ ] `ReadingRendererPreference.default` 是否仍为 `NativeComponent`（用户拍板的默认渲染器）。
+
+### 9.19 应用内更新检查：修好版本比较，并让 pre-release 也能被发现
+
+**现状盘点（2026-11-08 真机装 `.26` 后追问）**
+
+- **自动检查确实存在**：`AndroidApp.onCreate()` 冷启动跑一次 `checkUpdate()`，
+  条件 `isGitHub`（`BuildConfig.FLAVOR == "github"`，CI 出的正是这个变体），
+  `showToast = false`。**没有开关、没有后台周期任务、没有推送**。
+  手动复检入口是「关于与支持」页点 Logo（会先清空 `skipVersion`）。
+- **自动更新不存在**：`AppService.downloadFile()` → `cacheDir/latest.apk` →
+  `installLatestApk()` 的完整链路代码都还在，但 `UpdateDialog.kt` 里派发下载的那段被
+  注释禁用（原注释 "Disable automatic updates in F-Droid"），确认按钮只
+  `openURL("${github_link}/releases")`；冷启动还会删掉残留 `latest.apk`。
+  所以装新版仍要手动去 releases 页下载 APK 再点安装。
+
+**两个叠加的缺陷**
+
+1. `Version` 只按 `.` 拆前三段取整数。`v0.16.2-tablet.26` → `(0,16,0)`，
+   而 `app/build.gradle.kts` 的 `versionName = "0.16.2"` → `(0,16,2)`，
+   `whetherNeedUpdate()` 要求 `latest > current`，**恒为 false**。
+   于是联网、写偏好都做了，但更新弹窗与设置页横幅从不出现，手动点 Logo 也只回
+   「已是最新版本」。这是 fork 改用 `-tablet.N` tag 后与上游纯数字 tag 假设不兼容，
+   从第一条 tablet release 起就存在，与 §9.17 的 404 兜底无关。
+2. 发布首个正式版 `.26` 后，`/releases/latest` 从 404 变 200 且只返回最新**正式版**，
+   之后 push 出的 `.27`+ pre-release 不会再被主请求看到（§9.17 已预见）。
+
+**修法（用户拍板：修比较 + 预览版也提示）**
+
+- 新增 `domain/model/general/ForkVersion.kt`：`String?.toForkVersion()`，
+  把 `vX.Y.Z-tablet.N` 映射成 `Version(X, Y, N)`（如 `.26` → `0.16.26`），
+  不匹配 fork 形状的 tag 回退上游 `toVersion()`。新文件、纯函数、不动 `Version.kt`。
+- `ForkUpdateSource.kt`（fork 自有文件）：新增纯函数 `newerRelease(stable, newest)`；
+  `fetchForkUpdate()` **总是同时读** `/releases/latest` 与 `/releases?per_page=1`，
+  用 `toForkVersion()` 比较后取版本更高者。404 仍是「暂无正式版」的正常分支；
+  403 记为 rate limit，但只要另一路有结果就照常返回，避免把主目标的失败放大。
+- `AppService.kt` 最小接入：**1 行 import + 2 行注释 + 1 行调用**
+  （`latest.tag_name.toVersion()` → `toForkVersion()`）。不重排缩进。
+- 守卫测试：`ForkVersionTest`（6 例）、`ForkUpdateSourceTest`（7 例）。
+  两条分支用例刻意让「永远返回第一个」和「永远返回第二个」都会红，
+  不是不可失败的测试。
+
+**已知精度限制（有意接受）**
+
+所有 tablet 构建的 `versionName` 都是 `0.16.2`，app 分不清自己装的是 `.25` 还是 `.26`。
+因此修好后每次发布新版会提示**一次**，即便用户已经装了那个版本；点「跳过此版本」
+写入 `skipVersion = 0.16.N` 后即安静，直到下一版出现。要做到精确比对，需要在构建时把
+tablet 序号注入 APK（`versionNameSuffix` / `buildConfigField`），而 workflow 目前是
+**先 assemble、后算 tag**，顺序要一起改 —— 改动面更大，本轮不做。
+
+**上游同步后要核验的**
+
+- [ ] `Version.kt` 若被上游改了解析规则，`ForkVersionTest` 会红；确认
+      `toForkVersion()` 对 `vX.Y.Z-tablet.N` 的映射是否仍成立。
+- [ ] `AppService.checkUpdate()` 是否仍调用 `fetchForkUpdate()` 且用 `toForkVersion()`；
+      上游若改回 `getReleaseLatest()` 直连，pre-release 会再次隐形。
+- [ ] `NetworkDataSource.getReleases()` 与 `strings.xml` 的 `update_list_link` 是否还在；
+      两者是 fork 新增，正常不会被上游碰到。
+- [ ] `UpdateDialog` 的下载链路若被上游恢复，注意 F-Droid 合规：仅在 github flavor 启用，
+      并处理 `REQUEST_INSTALL_PACKAGES` 与 Android 8+ 未知来源授权。

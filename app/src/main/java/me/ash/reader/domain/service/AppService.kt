@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.withContext
 import me.ash.reader.R
+import me.ash.reader.domain.model.general.toForkVersion
 import me.ash.reader.domain.model.general.toVersion
 import me.ash.reader.infrastructure.di.IODispatcher
 import me.ash.reader.infrastructure.di.MainDispatcher
@@ -34,8 +35,8 @@ class AppService @Inject constructor(
 
     suspend fun checkUpdate(showToast: Boolean = true): Boolean? = withContext(ioDispatcher) {
         try {
-            // This fork publishes pre-releases, which GitHub hides from /releases/latest.
-            // The lookup falls back to the newest entry of the releases list on a 404.
+            // GitHub hides pre-releases from /releases/latest. The lookup also reads the
+            // releases list and keeps whichever tag is newer (see ForkUpdateSource).
             val lookup =
                 fetchForkUpdate(
                     networkDataSource,
@@ -57,7 +58,7 @@ class AppService @Inject constructor(
             }
             val skipVersion = context.skipVersionNumber.toVersion()
             val currentVersion = context.getCurrentVersion()
-            val latestVersion = latest.tag_name.toVersion()
+            val latestVersion = latest.tag_name.toForkVersion()
 //            val latestVersion = "1.0.0".toVersion()
             val latestLog = latest.body ?: ""
             val latestPublishDate = latest.published_at ?: latest.created_at ?: ""
