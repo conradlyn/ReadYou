@@ -1844,3 +1844,81 @@ GET api.github.com/repos/conradlyn/ReadYou/releases?per_page=1    → 200, tag v
       把 `ForkUpdateSource.kt` 的调用重新接入即可。
 - [ ] **若将来发布了正式版**，`/releases/latest` 会开始返回 200；那时兜底分支自然休眠，
       不要因为「用不上了」就删掉 —— 一旦又只发 pre-release 就会重新 404。
+
+## 9.18 `73f5963b` 的 Unit Tests 失败：sealed class companion 的类初始化顺序
+
+### 现象
+
+`73f5963b` 推送后三个 workflow 各恰好跑一次，`Build Commit #51` 与
+`Fork Auto Release #25` 成功，`Unit Tests (on push) #44` 失败。公开注解只有三条 Gradle 摘要
+（`> Task ... FAILED` / `What went wrong` / `Execution failed for task`），**看不到失败用例名**：
+
+- job 日志 `GET /actions/jobs/{id}/logs` → `403 Must have admin rights to Repository.`
+- artifact `GET /actions/artifacts/{id}/zip` → `401 Requires authentication`
+- `/commit/{sha}/checks/{check_run}/logs/{step}` → 404（匿名不开放）
+
+**突破口**：`nightly.link` 是公开仓库 artifact 的匿名代理，零配额、零认证：
+
+```
+https://nightly.link/conradlyn/ReadYou/actions/artifacts/13604308346.zip
+```
+
+拿到 62121 字节的 `unit-test-report-...zip`，解出 20 个 `TEST-*.xml`：
+**113 个测试，2 个失败，0 error，0 skipped**，全部在 `ReadingRendererPreferenceTest`。
+
+| 失败用例 | 实际值 |
+|---|---|
+| `the native component is the default renderer` | `expected same:<NativeComponent@…> was not:<null>` |
+| `both renderers are still offered in settings` | `values` 不含 `NativeComponent` |
+
+### 根因（真实生产隐患，不只是测试问题）
+
+`ReadingRendererPreference` 是 `sealed class` + 嵌套 `object WebView / NativeComponent`，
+companion 里写了 `val default = NativeComponent` 与
+`val values = listOf(WebView, NativeComponent)` 两个**字段初始化器**。JVM 构造嵌套 `object`
+会触发外层 `<clinit>`；若第一次进入该类是从某个嵌套 object 开始（单测里
+`assertSame(ReadingRendererPreference.NativeComponent, …)` 先求第一个实参，另一个用例
+`ReadingRendererPreference.WebView.value` 也一样），companion 的初始化器就会读到那个正在
+初始化、尚未赋值 `INSTANCE` 的单例 → `null`。实测结果正是 `default == null`、
+`values == [WebView, null]`。
+
+这不是「测试写错了」：把默认渲染器改成 `NativeComponent` 之后，任何先碰嵌套 object、
+后碰 companion 的路径都可能让 `Settings.kt` 的默认参数与 `LocalReadingRenderer` 的兜底
+拿到 `null`。同一模式在本仓库几十个 preference 里都有，但只有本轮新增的测试以这个顺序
+访问，所以首次暴露。
+
+### 修法
+
+`ReadingRendererPreference.kt` 里两行字段初始化器改成 getter（惰性求值）：
+
+```kotlin
+val default
+    get() = NativeComponent
+val values
+    get() = listOf(WebView, NativeComponent)
+```
+
+- `values` 只在 `ReadingStylePage` 做 `.map { RadioDialogOption(...) }`，本来每次重组就生成
+  新列表，getter 不改变任何行为或身份依赖。
+- `default` 仍返回同一个单例，`assertSame` 语义不变。
+- 只动 2 行、不重排缩进，符合上游易合并约束；**其余几十个同类 preference 不动**，
+  避免制造大面积合并冲突。
+
+`ReadingRendererPreferenceTest` 保留「先读嵌套 object」的实参顺序，并加注释说明它同时是
+类初始化顺序的守卫。
+
+### 配套：CI 现在能自己说出哪个测试红了
+
+`.github/workflows/fork-unit-tests.yaml` 新增 `Annotate failing tests`（`if: failure()`）：
+用内联 Python 解析 `app/build/test-results/**/TEST-*.xml`，把每个 `<failure>` / `<error>`
+的 classname、方法名、message 回显成 `::error::` 注解 —— 注解是匿名可见的唯一通道。
+已用本次失败的 20 份 XML 离线对拍，精确输出 2 条失败注解。原 `Unit tests` 里的 grep echo
+保留（它负责编译错误），两者互补。
+
+### 上游同步后要核验的
+
+- [ ] `ReadingRendererPreference.companion` 的 `default` / `values` 是否还是 getter；
+      上游若把它们改回字段初始化器，这个守卫测试会再次变红。
+- [ ] `fork-unit-tests.yaml` 的 `Annotate failing tests` 步骤是否被覆盖；它是 fork 自有文件，
+      正常不会被上游碰到。
+- [ ] `ReadingRendererPreference.default` 是否仍为 `NativeComponent`（用户拍板的默认渲染器）。

@@ -11,6 +11,10 @@ class ReadingRendererPreferenceTest {
     fun `the native component is the default renderer`() {
         // Product decision: on the target tablet the native LazyColumn path is noticeably
         // smoother than the WebView path. Reverting this silently undoes that choice.
+        //
+        // The argument order is deliberate: touching the nested object *first* is the JVM
+        // class-initialization order that used to leave the companion's `default` field null.
+        // Keeping it here makes this test a guard against that trap as well as the decision.
         assertSame(
             ReadingRendererPreference.NativeComponent,
             ReadingRendererPreference.default,

@@ -56,7 +56,8 @@ jobs:
       #
       # Keeping it costs nothing on a green run. Removing it would make the next compile error a
       # guessing game again, so it stays. The `tee`/`PIPESTATUS` shape is what keeps the step's exit
-      # status equal to Gradle's rather than to `tee`'s.
+      # status equal to Gradle's rather than to `tee`'s. Assertion failures are not covered by the
+      # grep - Gradle only prints their names, so the next step reads them out of the result XML.
       - name: Unit tests
         shell: bash
         run: |
@@ -70,6 +71,41 @@ jobs:
               | while IFS= read -r line; do echo "::error::$line"; done
             exit "$status"
           fi
+
+      # The echo above only sees Gradle's console. A failing assertion is printed there as a bare
+      # "N tests completed, K failed" line, while the class, method and message live in the XML.
+      # Job logs and artifacts both need credentials on this fork, so mirror the XML into
+      # annotations, which do render on the public run page for anonymous readers.
+      - name: Annotate failing tests
+        if: failure()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+
+          paths = sorted(glob.glob('app/build/test-results/**/TEST-*.xml', recursive=True))
+          if not paths:
+              print('::error::No TEST-*.xml found - the test task produced no result files')
+          found = 0
+          for path in paths:
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError as exc:
+                  print('::error::could not parse %s: %s' % (path, exc))
+                  continue
+              for case in root.findall('testcase'):
+                  for kind in ('failure', 'error'):
+                      node = case.find(kind)
+                      if node is None:
+                          continue
+                      found += 1
+                      message = ' '.join((node.get('message') or '').split())[:400]
+                      print('::error::%s > %s [%s] %s' % (
+                          case.get('classname'), case.get('name'), kind, message,
+                      ))
+          print('annotated %d failing test case(s) across %d report(s)' % (found, len(paths)))
+          PY
 
       # A skipped test still leaves the job green. ListFontBaselineTest skips itself with Assume when
       # the Compose typography classes cannot be loaded on a plain JVM, and for that one test a skip
