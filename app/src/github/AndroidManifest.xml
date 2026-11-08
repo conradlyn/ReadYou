@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- In-app APK installation is a github-flavor-only feature. Keeping the permission out of
+         the main manifest preserves F-Droid / Google Play compliance for the other flavors.
+         Android 8+ additionally requires the user to allow "install unknown apps" for this app;
+         UpdateDialog opens the system setting when canRequestPackageInstalls() is false. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- Android 11+ package visibility: ContextExt.installLatestApk() calls
+         queryIntentActivities() for ACTION_VIEW + application/vnd.android.package-archive. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+    </queries>
+
+</manifest>

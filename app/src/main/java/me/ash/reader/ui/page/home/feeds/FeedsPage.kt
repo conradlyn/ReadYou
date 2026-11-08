@@ -82,7 +82,7 @@ import me.ash.reader.ui.component.withFeedsListStyle
 import me.ash.reader.ui.ext.collectAsStateValue
 import me.ash.reader.ui.ext.currentAccountId
 import me.ash.reader.ui.ext.findActivity
-import me.ash.reader.ui.ext.getCurrentVersion
+import me.ash.reader.domain.service.getInstalledForkVersion
 import me.ash.reader.ui.ext.surfaceColorAtElevation
 import me.ash.reader.ui.page.common.RouteName
 import me.ash.reader.ui.page.home.feeds.accounts.AccountsTab
@@ -132,7 +132,7 @@ fun FeedsPage(
 
     val newVersion = LocalNewVersionNumber.current
     val skipVersion = LocalSkipVersionNumber.current
-    val currentVersion = remember { context.getCurrentVersion() }
+    val currentVersion = remember { context.getInstalledForkVersion() }
     val listState =
         if (groupWithFeedList.isNotEmpty()) feedsUiState.listState else rememberLazyListState()
 

@@ -1,6 +1,5 @@
 package me.ash.reader.ui.page.settings.tips
 
-import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -21,7 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,11 +30,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import kotlinx.coroutines.Dispatchers
 import me.ash.reader.R
-import me.ash.reader.infrastructure.preference.*
+import me.ash.reader.domain.service.isForkApkDownload
 import me.ash.reader.infrastructure.net.Download
+import me.ash.reader.infrastructure.preference.*
 import me.ash.reader.ui.component.base.RYDialog
 import me.ash.reader.ui.ext.collectAsStateValue
 import me.ash.reader.ui.ext.installLatestApk
+import me.ash.reader.ui.ext.isGitHub
 import me.ash.reader.ui.ext.openURL
 
 @Composable
@@ -44,31 +45,51 @@ fun UpdateDialog(
 ) {
     val context = LocalContext.current
     val updateUiState = updateViewModel.updateUiState.collectAsStateValue()
-    val downloadState = updateUiState.downloadFlow.collectAsState(initial = Download.NotYet).value
+    val downloadState = updateUiState.downloadState
     val scope = rememberCoroutineScope { Dispatchers.IO }
     val newVersionNumber = LocalNewVersionNumber.current
     val newVersionPublishDate = LocalNewVersionPublishDate.current
     val newVersionLog = LocalNewVersionLog.current
     val newVersionSize = LocalNewVersionSize.current
+    val newVersionDownloadUrl = LocalNewVersionDownloadUrl.current
+    val releasesUrl = "${context.getString(R.string.github_link)}/releases"
 
+    // Android 8+ gates sideloading behind a per-app setting. The system installer does the actual
+    // install; this app only needs permission to request it (declared in the github flavor only).
     val settings = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        context.installLatestApk()
+        if (context.packageManager.canRequestPackageInstalls()) {
+            context.installLatestApk()
+        }
     }
 
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { result ->
-        if (result) {
+    fun requestInstall() {
+        if (context.packageManager.canRequestPackageInstalls()) {
             context.installLatestApk()
         } else {
-            settings.launch(
-                Intent(
-                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                    Uri.parse("package:${context.packageName}"),
-                ),
-            )
+            try {
+                settings.launch(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${context.packageName}"),
+                    ),
+                )
+            } catch (e: Throwable) {
+                Log.e("RLog", "cannot open install settings: ${e.message}")
+                context.openURL(releasesUrl, OpenLinkPreference.AutoPreferCustomTabs)
+            }
+        }
+    }
+
+    // The upstream code called installLatestApk() from inside a Text() composable, i.e. during
+    // composition. Drive the installer from the download state instead, once per finished download.
+    val downloadFinished = isGitHub && downloadState is Download.Finished
+    LaunchedEffect(downloadFinished) {
+        if (downloadFinished) {
+            val file = (downloadState as Download.Finished).file
+            Log.i("RLog", "Download.Finished: ${file.absolutePath}")
+            requestInstall()
         }
     }
 
@@ -107,33 +128,24 @@ fun UpdateDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    context.openURL("${context.getString(R.string.github_link)}/releases", OpenLinkPreference.AutoPreferCustomTabs)
-                    // Disable automatic updates in F-Droid
-//                    if (downloadState !is Download.Progress) {
-//                        updateViewModel.dispatch(
-//                            UpdateViewAction.DownloadUpdate(
-//                                url = context.newVersionDownloadUrl,
-//                            )
-//                        )
-//                    }
+                    when {
+                        // Already downloaded: just (re)open the system installer.
+                        downloadState is Download.Finished -> requestInstall()
+                        // One download at a time; the ViewModel also guards this.
+                        downloadState is Download.Progress -> Unit
+                        // F-Droid / Google Play must keep the old behaviour, and a URL that is not
+                        // one of this fork's release assets is never handed to the installer.
+                        !isGitHub || !isForkApkDownload(newVersionDownloadUrl) ->
+                            context.openURL(releasesUrl, OpenLinkPreference.AutoPreferCustomTabs)
+                        else -> updateViewModel.downloadUpdate(newVersionDownloadUrl)
+                    }
                 }
             ) {
                 Text(
                     text = stringResource(R.string.update) + when (downloadState) {
                         is Download.NotYet -> ""
                         is Download.Progress -> " ${downloadState.percent}%"
-                        is Download.Finished -> {
-                            if (context.packageManager.canRequestPackageInstalls()) {
-                                Log.i(
-                                    "RLog",
-                                    "Download.Finished: ${downloadState.file.absolutePath}"
-                                )
-                                context.installLatestApk()
-                            } else {
-                                launcher.launch(Manifest.permission.REQUEST_INSTALL_PACKAGES)
-                            }
-                            ""
-                        }
+                        is Download.Finished -> ""
                     }
                 )
             }

@@ -17,7 +17,6 @@ import me.ash.reader.infrastructure.net.NetworkDataSource
 import me.ash.reader.infrastructure.net.downloadToFileWithProgress
 import me.ash.reader.infrastructure.preference.*
 import me.ash.reader.infrastructure.preference.NewVersionSizePreference.formatSize
-import me.ash.reader.ui.ext.getCurrentVersion
 import me.ash.reader.ui.ext.getLatestApk
 import me.ash.reader.ui.ext.showToast
 import me.ash.reader.ui.ext.skipVersionNumber
@@ -57,7 +56,9 @@ class AppService @Inject constructor(
                 return@withContext null
             }
             val skipVersion = context.skipVersionNumber.toVersion()
-            val currentVersion = context.getCurrentVersion()
+            // Precise comparison: the release APK carries its own tablet serial in BuildConfig,
+            // so an installed .28 is not told that .28 is a new version on every cold start.
+            val currentVersion = context.getInstalledForkVersion()
             val latestVersion = latest.tag_name.toForkVersion()
 //            val latestVersion = "1.0.0".toVersion()
             val latestLog = latest.body ?: ""

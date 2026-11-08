@@ -37,7 +37,7 @@ import me.ash.reader.ui.component.base.Banner
 import me.ash.reader.ui.component.base.DisplayText
 import me.ash.reader.ui.component.base.FeedbackIconButton
 import me.ash.reader.ui.component.base.RYScaffold
-import me.ash.reader.ui.ext.getCurrentVersion
+import me.ash.reader.domain.service.getInstalledForkVersion
 import me.ash.reader.ui.page.settings.tips.UpdateDialog
 import me.ash.reader.ui.page.settings.tips.UpdateViewModel
 import me.ash.reader.ui.theme.palette.onLight
@@ -57,7 +57,7 @@ fun SettingsPage(
     val context = LocalContext.current
     val newVersion = LocalNewVersionNumber.current
     val skipVersion = LocalSkipVersionNumber.current
-    val currentVersion by remember { mutableStateOf(context.getCurrentVersion()) }
+    val currentVersion by remember { mutableStateOf(context.getInstalledForkVersion()) }
 
     RYScaffold(
         containerColor = MaterialTheme.colorScheme.surface onLight MaterialTheme.colorScheme.inverseOnSurface,

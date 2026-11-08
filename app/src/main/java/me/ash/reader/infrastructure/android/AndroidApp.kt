@@ -19,8 +19,6 @@ import me.ash.reader.domain.service.AppService
 import me.ash.reader.domain.service.RssService
 import me.ash.reader.infrastructure.di.ApplicationScope
 import me.ash.reader.infrastructure.di.IODispatcher
-import me.ash.reader.ui.ext.del
-import me.ash.reader.ui.ext.getLatestApk
 import me.ash.reader.ui.ext.isGitHub
 import timber.log.Timber
 
@@ -110,9 +108,9 @@ class AndroidApp : Application(), Configuration.Provider {
 
     private suspend fun checkUpdate() {
         if (!isGitHub) return
-        withContext(ioDispatcher) {
-            applicationContext.getLatestApk().let { if (it.exists()) it.del() }
-        }
+        // Do not delete cacheDir/latest.apk here. That upstream cleanup raced with the in-app
+        // update flow: a cold start after the download but before the install discarded the APK.
+        // A new download overwrites the file, and Android reclaims the cache when it needs space.
         appService.checkUpdate(showToast = false)
     }
 }

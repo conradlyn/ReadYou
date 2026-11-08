@@ -64,8 +64,37 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # The APK must know its own tablet serial (BuildConfig.TABLET_BUILD) so the in-app update
+      # check can compare against `v<version>-tablet.<serial>` tags exactly. So the serial has to
+      # be decided BEFORE Gradle runs, and the tag cut afterwards must use the same number.
+      # The concurrency group serialises this workflow, so a sibling run cannot steal the number.
+      - name: Reserve the tablet build serial
+        id: serial
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+            app/build.gradle.kts | head -1)
+          if [ -z "$version" ]; then
+            echo "::error::could not read versionName from app/build.gradle.kts"
+            exit 1
+          fi
+          prefix="v${version}-tablet."
+          git fetch --tags --force origin 2>/dev/null || true
+          existing=$(git tag -l "${prefix}*" | sort -V)
+          last=$(printf '%s\n' "$existing" | sed "s|^${prefix}||" | sort -n | tail -1)
+          serial=$(( ${last:-0} + 1 ))
+          tag="${prefix}${serial}"
+          prev=$(printf '%s\n' "$existing" | tail -1)
+          {
+            echo "version=${version}"
+            echo "serial=${serial}"
+            echo "tag=${tag}"
+            echo "prev=${prev}"
+          } >> "$GITHUB_OUTPUT"
+          echo "reserved ${tag} (serial ${serial}, previous ${prev:-none})"
+
       - name: Assemble
-        run: ./gradlew assembleGithubRelease --max-workers=2
+        run: ./gradlew assembleGithubRelease -PtabletBuild=${{ steps.serial.outputs.serial }} --max-workers=2
 
       # Uses the gh CLI that ships with the runner rather than a third-party release action, to
       # keep the supply chain the same as the rest of this repo (same as release-build.yaml).
@@ -75,6 +104,11 @@ jobs:
           # Empty on a push-triggered run (the `inputs` context has no value there), so the default
           # below applies. Only a manual run can set it to "false".
           PRERELEASE_INPUT: ${{ inputs.prerelease }}
+          # Frozen at assemble time: the APK already carries this serial in BuildConfig.
+          RESERVED_VERSION: ${{ steps.serial.outputs.version }}
+          RESERVED_SERIAL: ${{ steps.serial.outputs.serial }}
+          RESERVED_TAG: ${{ steps.serial.outputs.tag }}
+          RESERVED_PREV: ${{ steps.serial.outputs.prev }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -100,41 +134,36 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Read the version out of the build script rather than hardcoding it, so the tag can
-          # never drift from the APK file name (ReadYou-<versionName>-<sha>.apk).
-          version=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
-            app/build.gradle.kts | head -1)
-          if [ -z "$version" ]; then
-            echo "::error::could not read versionName from app/build.gradle.kts"
+          # The tag is frozen at the serial reserved before assemble. Recomputing it here could
+          # let the published tag disagree with BuildConfig.TABLET_BUILD baked into the APK,
+          # making the in-app "am I up to date?" check wrong by one build. A collision is a hard
+          # failure rather than a bump for exactly that reason.
+          version="${RESERVED_VERSION}"
+          serial="${RESERVED_SERIAL}"
+          tag="${RESERVED_TAG}"
+          prev="${RESERVED_PREV}"
+          echo "version: ${version}, reserved serial: ${serial}, tag: ${tag}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "::error::tag ${tag} already exists on origin; refusing to publish an APK whose serial disagrees"
             exit 1
           fi
-          prefix="v${version}-tablet."
-          echo "version: ${version} (tag prefix ${prefix})"
 
-          # Next serial = highest existing + 1. Retried against freshly fetched tags, because a
-          # sibling run that was queued behind this one may have taken the number already.
-          tag=""
-          prev=""
-          for attempt in 1 2 3 4 5; do
-            # `--force` so a tag an earlier run rewrote locally cannot block the fetch. No
-            # `--prune-tags`: the runner's origin has no tag refspec, and git refuses that combo.
-            git fetch --tags --force origin 2>/dev/null || true
-            existing=$(git tag -l "${prefix}*" | sort -V)
-            last=$(printf '%s\n' "$existing" | sed "s|^${prefix}||" | sort -n | tail -1)
-            prev=$(printf '%s\n' "$existing" | tail -1)
-            tag="${prefix}$(( ${last:-0} + 1 ))"
-            echo "attempt ${attempt}: tag=${tag} prev=${prev:-none}"
-            if git tag -a "$tag" -m "ReadYou ${version} - tablet preview build ${tag##*.}" \
+          pushed=false
+          for attempt in 1 2 3; do
+            if git tag -a "$tag" -m "ReadYou ${version} - tablet preview build ${serial}" \
                && git push origin "$tag"; then
+              pushed=true
               break
             fi
             git tag -d "$tag" >/dev/null 2>&1 || true
-            tag=""
-            if [ "$attempt" = 5 ]; then
-              echo "::error::could not push a fresh tag after 5 attempts"
-              exit 1
-            fi
+            echo "attempt ${attempt}: could not push ${tag}, retrying"
+            sleep 2
           done
+          if [ "$pushed" != true ]; then
+            echo "::error::could not push ${tag} after 3 attempts"
+            exit 1
+          fi
 
           # Markdown is whitespace sensitive: build the notes from explicit newlines, so that the
           # indentation of this script never turns into a code block. (Same trap as release-build.yaml.)
@@ -156,5 +185,6 @@ jobs:
           {
             echo "### Released \`${tag}\`"
             echo ""
+            echo "- \`BuildConfig.TABLET_BUILD = ${serial}\` baked into the APK"
             echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
           } >> "$GITHUB_STEP_SUMMARY"

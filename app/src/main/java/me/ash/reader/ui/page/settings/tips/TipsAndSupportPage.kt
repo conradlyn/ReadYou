@@ -68,7 +68,7 @@ import me.ash.reader.ui.component.base.FeedbackIconButton
 import me.ash.reader.ui.component.base.RYScaffold
 import me.ash.reader.ui.ext.DataStoreKey
 import me.ash.reader.ui.ext.dataStore
-import me.ash.reader.ui.ext.getCurrentVersion
+import me.ash.reader.domain.service.getInstalledForkVersionLabel
 import me.ash.reader.ui.ext.openURL
 import me.ash.reader.ui.ext.put
 import me.ash.reader.ui.ext.showToast
@@ -136,7 +136,7 @@ fun TipsAndSupportPage(
 
 
     LaunchedEffect(Unit) {
-        currentVersion = context.getCurrentVersion().toString()
+        currentVersion = context.getInstalledForkVersionLabel()
     }
 
     RYScaffold(

@@ -23,6 +23,10 @@ fun fetchGitCommitHash(): String {
 }
 
 val gitCommitHash = fetchGitCommitHash()
+// CI passes -PtabletBuild=<serial> before assembling, so the APK knows exactly which tablet
+// build it is (the tag is cut with the same number). Local builds and the plain Build Commit
+// workflow stay at 0, which keeps the upstream version-comparison behaviour unchanged.
+val tabletBuild: Int = project.findProperty("tabletBuild")?.toString()?.toIntOrNull() ?: 0
 val keyProps = Properties()
 val releaseKeyPropsFile: File = rootProject.file("signature/keystore_release.properties")
 val debugKeyPropsFile: File = rootProject.file("signature/keystore.properties")
@@ -50,6 +54,9 @@ android {
             "USER_AGENT_STRING",
             "\"ReadYou/${versionName}(${versionCode})\"",
         )
+        // Kept out of versionName on purpose: the release tag and the APK file name must stay
+        // `v<versionName>-tablet.<serial>` / `ReadYou-<versionName>-<sha>.apk`.
+        buildConfigField("int", "TABLET_BUILD", tabletBuild.toString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

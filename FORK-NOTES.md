@@ -1964,13 +1964,13 @@ val values
   两条分支用例刻意让「永远返回第一个」和「永远返回第二个」都会红，
   不是不可失败的测试。
 
-**已知精度限制（有意接受）**
+**已知精度限制（已被用户否决，见 9.20）**
 
 所有 tablet 构建的 `versionName` 都是 `0.16.2`，app 分不清自己装的是 `.25` 还是 `.26`。
 因此修好后每次发布新版会提示**一次**，即便用户已经装了那个版本；点「跳过此版本」
-写入 `skipVersion = 0.16.N` 后即安静，直到下一版出现。要做到精确比对，需要在构建时把
-tablet 序号注入 APK（`versionNameSuffix` / `buildConfigField`），而 workflow 目前是
-**先 assemble、后算 tag**，顺序要一起改 —— 改动面更大，本轮不做。
+写入 `skipVersion = 0.16.N` 后即安静，直到下一版出现。当时判断「改动面更大，本轮不做」，
+但用户明确不接受「每次同版本还要点掉」，已在 9.20 用 `BuildConfig.TABLET_BUILD` 彻底解决，
+本节仅保留作为当时的决策记录。
 
 **上游同步后要核验的**
 
@@ -2009,3 +2009,76 @@ GET /releases.atom           -> [.27, .26, .25, ...]   (正常时间序)
 
 复核要点：以后若 GitHub 改回严格时间序，这个扫描仍然正确；若分页首页没有覆盖到更新的
 预览版（>20 个 release 且乱序极端情况），需要再加大 `per_page` 或改读 atom feed。
+
+### 9.20 应用内自动更新 + 精确版本（用户明确要求，推翻 9.19 的两处妥协）
+
+用户反馈原话：「为什么还是这些问题？自动更新应该要有。精度控制本身应该加进去啊，
+不然不是很愚蠢吗，每次都是一样的还要点掉。」因此本节同时修掉两件事：
+**① 应用内必须能下载并拉起安装**（不再只打开 releases 页）；
+**② APK 必须知道自己是哪一版**（不再每次冷启动重复提示同一个版本）。
+
+#### 9.20.1 让 APK 知道自己的 tablet 序号
+
+- `app/build.gradle.kts`：`val tabletBuild = project.findProperty("tabletBuild")... ?: 0`，
+  `defaultConfig` 加 `buildConfigField("int", "TABLET_BUILD", tabletBuild.toString())`。
+  **不写进 `versionName`**：release tag 和 APK 文件名必须继续是
+  `v<versionName>-tablet.<serial>` / `ReadYou-<versionName>-<sha>.apk`。
+  本地构建、`Build Commit`、`Unit Tests` 都不带 `-P`，因此 `TABLET_BUILD = 0`，
+  保留上游比较行为（把已发布版本都当作更新）。
+- `fork-auto-release.yaml` 改了**顺序**：新增 `Reserve the tablet build serial` 步骤在
+  Gradle 之前按 tag 算出 serial → `./gradlew assembleGithubRelease -PtabletBuild=<serial>` →
+  `Cut a tag and publish` 用**同一个冻结的 serial** 建 tag。
+  顺序不能反：APK 里的序号和 tag 的序号错位，精确比较就会差一个版本。
+  `concurrency` 已串行化该 workflow；发布前再 `git ls-remote` 查碰撞，撞了**硬失败**而不是
+  偷偷改用别的序号。本地已用临时 git 仓库（含 `.9/.10/.26/.27/.28`）复算：下一个是 `.29`。
+- `ForkUpdateSupport.kt`（新增，fork 自有）：`Context.getInstalledForkVersion()` /
+  `getInstalledForkVersionLabel()` 读 `BuildConfig.TABLET_BUILD`，关于页显示
+  `0.16.2-tablet.29`。`AppService`、`FeedsPage`、`SettingsPage`、关于页共 4 处
+  把 `getCurrentVersion()` 换成它，所有更新判断点统一到同一坐标系。
+  崩溃报告 / 导出文件名里的 `getCurrentVersion()` 保留（那里只是展示纯 versionName）。
+
+#### 9.20.2 三字段坐标系：把 versionName 的 point 也编进去
+
+`Version` 只有三个整数字段。9.19 把 `v0.16.2-tablet.N` 映射成 `(0,16,N)`，
+**上游一旦把 `versionName` 改成 `0.16.3`，serial 从 1 重来，`v0.16.3-tablet.1` →
+`(0,16,1)` 反而小于已装的 `.29` `(0,16,29)`，更新检查会永久沉默**。
+
+现改为 `major.minor.<point * 10000 + serial>`：
+`v0.16.2-tablet.26 → 0.16.20026`，`v0.16.3-tablet.1 → 0.16.30001`。
+`toForkVersion()`（release tag）与 `installedForkVersion()`（本机 APK）用同一个
+`combinedPoint()`，Long 运算后 clamp 到 `Int.MAX_VALUE`，防溢出。
+`ForkVersionTest` 新增 point 版本提升 / minor 提升 / 溢出守卫；
+`ForkUpdateSourceTest` 新增 `newestByVersionSurvivesAVersionNamePointBump`。
+**已装 `.29` 遇到 `.29` 不再提示，遇到 `.30` 才提示；点「跳过此版本」写入的也是同一坐标系，
+所以 skip 精确到具体构建。**
+
+#### 9.20.3 恢复应用内下载与自动安装
+
+| 文件 | 改动 |
+| --- | --- |
+| `UpdateDialog.kt` | 确认按钮真正派发 `updateViewModel.downloadUpdate(LocalNewVersionDownloadUrl.current)`；下载中显示百分比；`Download.Finished` 用 `LaunchedEffect` 拉起安装（上游原来在 `Text()` 的 composition 里直接调 `installLatestApk()`，副作用位置错误）；Android 8+ 用 `ACTION_MANAGE_UNKNOWN_APP_SOURCES` 申请未知来源授权 |
+| `UpdateViewModel.kt` | `downloadFlow: Flow<Download>` → `downloadState: Download`，由单个 `downloadJob` 收集一次。原来的冷 Flow 每次重组/返回页面都会重新 collect，**重新从 0 下载**；失败（AppService 返回 `emptyFlow()`）重置按钮，不再卡在 `0%` |
+| `AndroidApp.kt` | 删掉冷启动 `cacheDir/latest.apk` 的清理。它会和「下载完还没装、用户冷启动」竞态，把刚下好的 APK 删掉 |
+| `ForkApkDownloadUrl.kt` | 新增纯函数 `isForkApkDownload()`。下载 URL 来自网络 metadata，按不可信输入处理：只接受 `https://github.com/conradlyn/ReadYou/releases/download/...apk`，拒绝 http / 其他 host / 其他仓库 / 非 APK / query / fragment / 路径穿越 / userinfo / 非 443 端口 |
+| `app/src/github/AndroidManifest.xml` | 新增 flavor 专属 `REQUEST_INSTALL_PACKAGES` + `<queries>`。**只在 github flavor 声明**，F-Droid / Google Play 保持合规，且这些变体的 `isGitHub` 为 false，确认按钮仍只打开 releases 页 |
+
+已注释掉的 `UpdateViewAction.DownloadUpdate` 不能照抄恢复：那个类在仓库里已不存在，
+正确来源是 `LocalNewVersionDownloadUrl`；`downloadUpdate()` 是现成方法。
+
+**用户侧流程**：冷启动静默检查 → 有真更新时订阅源页/设置页出现横幅 → 点横幅看更新日志 →
+点「更新」自动下载并弹出系统安装器。不再需要去 GitHub 手动下载，也不再重复提示同一版。
+**刻意保留一次点击**：不在后台静默下载几十 MB，也不静默安装（Android 本来就必须让用户确认）。
+
+#### 9.20.4 迁移与上游同步注意
+
+- 已装的 `.26` / `.28` 是本改动**之前**构建的，`TABLET_BUILD = 0`。它们会把 `.29` 当作
+  新版本提示（本来也确实该升级）；**装过一次 `.29`+ 之后才具备精确比较能力**。
+- `skipVersion` / `newVersionNumber` 里存的是映射后的三字段字符串（如 `0.16.20029`）。
+  旧值 `0.16.28` 与新坐标系不冲突（远小于 `0.16.20029`），不会误屏蔽新版本。
+- 上游同步后核验：`app/build.gradle.kts` 的 `buildConfigField` 与 `-PtabletBuild` 接线、
+  `fork-auto-release.yaml` 的「先 reserve 再 assemble」顺序（**这两处是 fork 自有改动，
+  上游改 workflow / build.gradle 时最容易被覆盖**）、`UpdateDialog` 是否又被改回只开浏览器、
+  `app/src/github/AndroidManifest.xml` 是否被误并进 main。
+- 正式版仍靠手动 `Run workflow` 取消勾选 `prerelease` 发布；push 到 `main` 的含代码改动
+  一律出 pre-release。`/releases/latest` 只返回正式版 `.26`，应用内靠 9.19.1 的
+  `per_page=20` 扫描看到后续预览版。

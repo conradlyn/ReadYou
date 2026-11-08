@@ -20,6 +20,7 @@ class UpdateViewModel @Inject constructor(
     val updateUiState: StateFlow<UpdateUiState> = _updateUiState.asStateFlow()
 
     var updateJob: Job? = null
+    private var downloadJob: Job? = null
 
     fun checkUpdate(
         preProcessor: suspend () -> Unit = {},
@@ -58,17 +59,21 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
+    // Collect here instead of in the dialog: the upstream cold Flow was re-collected on every
+    // recomposition / navigation back to the page, which restarted the APK download from zero.
+    // A single Job plus a State field also makes "already downloading" and "ready to install"
+    // observable states rather than a Flow that has to be replayed.
     fun downloadUpdate(url: String) {
-        viewModelScope.launch {
-            _updateUiState.update {
-                it.copy(
-                    downloadFlow = flow { emit(Download.Progress(0)) }
-                )
+        if (downloadJob?.isActive == true) return
+        downloadJob = viewModelScope.launch {
+            _updateUiState.update { it.copy(downloadState = Download.Progress(0)) }
+            appService.downloadFile(url).collect { state ->
+                _updateUiState.update { it.copy(downloadState = state) }
             }
-            _updateUiState.update {
-                it.copy(
-                    downloadFlow = appService.downloadFile(url)
-                )
+            // AppService returns an empty flow when the request fails (it already shows a toast).
+            // Reset the button instead of leaving it stuck at "Update 0%" forever.
+            if (_updateUiState.value.downloadState !is Download.Finished) {
+                _updateUiState.update { it.copy(downloadState = Download.NotYet) }
             }
         }
     }
@@ -76,5 +81,5 @@ class UpdateViewModel @Inject constructor(
 
 data class UpdateUiState(
     val updateDialogVisible: Boolean = false,
-    val downloadFlow: Flow<Download> = emptyFlow(),
+    val downloadState: Download = Download.NotYet,
 )

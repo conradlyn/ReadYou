@@ -65,6 +65,17 @@ class ForkUpdateSourceTest {
         assertSame(preview, newerRelease(stable, newestByVersion(listOf(stable, preview, older))))
     }
 
+    // After an upstream versionName bump the serial restarts at 1. Selection must follow the
+    // version number, not the raw serial, or later releases would never be surfaced.
+    @Test
+    fun newestByVersionSurvivesAVersionNamePointBump() {
+        val oldLine = release("v0.16.2-tablet.29")
+        val newLine = release("v0.16.3-tablet.1")
+        assertSame(newLine, newestByVersion(listOf(oldLine, newLine)))
+        assertSame(newLine, newestByVersion(listOf(newLine, oldLine)))
+        assertSame(newLine, newerRelease(oldLine, newLine))
+    }
+
     @Test
     fun newestByVersionKeepsTheEarlierEntryOnTies() {
         val stable = release("v0.16.2-tablet.26")
